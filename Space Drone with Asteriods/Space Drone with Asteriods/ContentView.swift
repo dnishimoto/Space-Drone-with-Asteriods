@@ -202,6 +202,11 @@ final class GameState: ObservableObject {
     @Published var volume: Double = 1.0
     @Published private(set) var frameTick: Int = 0
 
+    /// True while the shield is up and the ship is immune to collisions.
+    @Published private(set) var shieldActive = false
+    /// True while the shield is on cooldown and cannot be reactivated.
+    @Published private(set) var shieldOnCooldown = false
+
     var gameWidth: CGFloat = 0
     var gameHeight: CGFloat = 0
 
@@ -209,8 +214,13 @@ final class GameState: ObservableObject {
     private var fireTimer: Timer?
     private var enemyShipDelayTimer: Timer?
     private var enemyShootTimer: Timer?
+    private var shieldTimer: Timer?
+    private var shieldCooldownTimer: Timer?
     private var enemyShipActive = false
     private var isFiring = false
+
+    static let shieldDuration: TimeInterval = 2.0
+    static let shieldCooldown: TimeInterval = 5.0
 
     /// Set by the left joystick each drag update. x = turn (-1...1), y = thrust when negative (up).
     var leftJoystickVector: CGVector = .zero
@@ -349,6 +359,22 @@ final class GameState: ObservableObject {
         fireTimer?.invalidate()
     }
 
+    func activateShield() {
+        guard !gameOver, !shieldActive, !shieldOnCooldown else { return }
+
+        shieldActive = true
+        shieldTimer?.invalidate()
+        shieldTimer = Timer.scheduledTimer(withTimeInterval: GameState.shieldDuration, repeats: false) { [weak self] _ in
+            guard let self = self else { return }
+            self.shieldActive = false
+            self.shieldOnCooldown = true
+            self.shieldCooldownTimer?.invalidate()
+            self.shieldCooldownTimer = Timer.scheduledTimer(withTimeInterval: GameState.shieldCooldown, repeats: false) { [weak self] _ in
+                self?.shieldOnCooldown = false
+            }
+        }
+    }
+
     private func enemyShootLaser() {
         guard !gameOver, let enemy = enemySpaceShip, enemyShipActive, !enemy.destroyed else { return }
         let startPosition = CGPoint(
@@ -403,7 +429,9 @@ final class GameState: ObservableObject {
         for (li, laser) in enemyLasers.enumerated() {
             if isCollision(laser.position, targetPosition: spaceShip.position, radius: 15) {
                 enemyLasersToRemove.insert(li)
-                gameOver = true
+                if !shieldActive {
+                    gameOver = true
+                }
             }
             for (ai, asteroid) in asteroids.enumerated() {
                 let radius = asteroid.size.value / 2 + 5
@@ -425,6 +453,7 @@ final class GameState: ObservableObject {
         for asteroid in asteroids {
             let radius = asteroid.size.value / 2 + 5
             if isCollision(spaceShip.position, targetPosition: asteroid.position, radius: radius) {
+                if shieldActive { continue }
                 return true
             }
             if let enemy = enemySpaceShip, !enemy.destroyed,
@@ -433,7 +462,7 @@ final class GameState: ObservableObject {
             }
         }
         if let enemy = enemySpaceShip, !enemy.destroyed,
-           isCollision(spaceShip.position, targetPosition: enemy.position, radius: 15) {
+           isCollision(spaceShip.position, targetPosition: enemy.position, radius: 15), !shieldActive {
             return true
         }
         return false
@@ -454,6 +483,10 @@ final class GameState: ObservableObject {
         enemyLasers.removeAll()
         score = 0
         gameOver = false
+        shieldActive = false
+        shieldOnCooldown = false
+        shieldTimer?.invalidate()
+        shieldCooldownTimer?.invalidate()
     }
 
     func stopAll() {
@@ -461,6 +494,8 @@ final class GameState: ObservableObject {
         fireTimer?.invalidate()
         enemyShipDelayTimer?.invalidate()
         enemyShootTimer?.invalidate()
+        shieldTimer?.invalidate()
+        shieldCooldownTimer?.invalidate()
     }
 }
 
@@ -601,6 +636,12 @@ struct ContentView: View {
                             Text("Right stick: push to fire")
                                 .foregroundColor(.orange)
                                 .font(.system(size: 13, weight: .bold))
+                            Text("Center: shield (2s, 5s cooldown)")
+                                .foregroundColor(.cyan)
+                                .font(.system(size: 13, weight: .bold))
+                            Text("Below shield: hold to fire")
+                                .foregroundColor(.red)
+                                .font(.system(size: 13, weight: .bold))
                         }
                         Spacer()
                         Button(action: { showVolumeDialog = true }) {
@@ -622,6 +663,45 @@ struct ContentView: View {
                             game.leftJoystickVector = .zero
                         })
                         .padding(.leading, 32)
+
+                        Spacer()
+
+                        Button(action: { game.activateShield() }) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.cyan.opacity(game.shieldActive ? 0.5 : (game.shieldOnCooldown ? 0.1 : 0.25)))
+                                    .frame(width: 56, height: 56)
+                                Circle()
+                                    .strokeBorder(Color.cyan.opacity(0.7), lineWidth: 2)
+                                    .frame(width: 56, height: 56)
+                                Image(systemName: "shield.fill")
+                                    .foregroundColor(.cyan)
+                                    .font(.system(size: 24))
+                            }
+                        }
+                        .disabled(game.shieldActive || game.shieldOnCooldown)
+                        .opacity(game.shieldOnCooldown ? 0.4 : 1.0)
+                        .padding(.bottom, 12)
+
+                        Button(action: {}) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.red.opacity(0.35))
+                                    .frame(width: 56, height: 56)
+                                Circle()
+                                    .strokeBorder(Color.red.opacity(0.7), lineWidth: 2)
+                                    .frame(width: 56, height: 56)
+                                Image(systemName: "bolt.fill")
+                                    .foregroundColor(.red)
+                                    .font(.system(size: 24))
+                            }
+                        }
+                        .simultaneousGesture(
+                            DragGesture(minimumDistance: 0)
+                                .onChanged { _ in game.startFiring() }
+                                .onEnded { _ in game.stopFiring() }
+                        )
+                        .padding(.bottom, 30)
 
                         Spacer()
 
@@ -664,6 +744,19 @@ struct ContentView: View {
             flame.move(to: CGPoint(x: -15, y: 0))
             flame.addLine(to: CGPoint(x: -25, y: 0))
             shipContext.stroke(flame, with: .color(.orange), lineWidth: 2)
+        }
+
+        // Shield shell
+        if game.shieldActive {
+            let shieldRadius: CGFloat = 26
+            let shieldRect = CGRect(
+                x: game.spaceShip.position.x - shieldRadius,
+                y: game.spaceShip.position.y - shieldRadius,
+                width: shieldRadius * 2,
+                height: shieldRadius * 2
+            )
+            context.fill(Path(ellipseIn: shieldRect), with: .color(.cyan.opacity(0.15)))
+            context.stroke(Path(ellipseIn: shieldRect), with: .color(.cyan.opacity(0.8)), lineWidth: 2)
         }
 
         // Enemy ship
