@@ -70,20 +70,31 @@ final class SpaceShip {
     var position = CGPoint(x: 200, y: 300)
     var angle: Double = -Double.pi / 2
     var velocity = CGVector(dx: 0, dy: 0)
-    var isThrusting = false
-    /// -1 = turning counterclockwise, 1 = turning clockwise, 0 = no turn
+    /// -1...1 analog thrust strength from the joystick's vertical deflection.
+    /// Positive = forward (in the direction the ship is facing), negative = reverse.
+    var thrustAmount: Double = 0
+    /// -1 = turning counterclockwise, 1 = turning clockwise, 0 = no turn.
+    /// Can be fractional for analog joystick input.
     var turnInput: Double = 0
 
-    static let maxSpeed: CGFloat = 5.0
-    static let acceleration: CGFloat = 0.1
+    /// Convenience flag used by the renderer to decide whether to draw a thruster flame.
+    var isThrusting: Bool { thrustAmount > 0 }
+    var isReversing: Bool { thrustAmount < 0 }
+
+    static let maxSpeed: CGFloat = 4.0
+    static let acceleration: CGFloat = 0.05
+    static let reverseAcceleration: CGFloat = 0.035
     static let friction: CGFloat = 0.02
+    static let turnRate: Double = 0.05
 
     func update(gameWidth: CGFloat, gameHeight: CGFloat) {
-        angle += turnInput * 0.1
+        angle += turnInput * SpaceShip.turnRate
 
-        if isThrusting {
-            velocity.dx += CGFloat(cos(angle)) * SpaceShip.acceleration
-            velocity.dy += CGFloat(sin(angle)) * SpaceShip.acceleration
+        if thrustAmount != 0 {
+            let rate = thrustAmount > 0 ? SpaceShip.acceleration : SpaceShip.reverseAcceleration
+            let accel = rate * CGFloat(thrustAmount)
+            velocity.dx += CGFloat(cos(angle)) * accel
+            velocity.dy += CGFloat(sin(angle)) * accel
         }
 
         velocity.dx *= (1 - SpaceShip.friction)
@@ -204,8 +215,6 @@ final class GameState: ObservableObject {
 
     /// True while the shield is up and the ship is immune to collisions.
     @Published private(set) var shieldActive = false
-    /// True while the shield is on cooldown and cannot be reactivated.
-    @Published private(set) var shieldOnCooldown = false
 
     var gameWidth: CGFloat = 0
     var gameHeight: CGFloat = 0
@@ -215,12 +224,12 @@ final class GameState: ObservableObject {
     private var enemyShipDelayTimer: Timer?
     private var enemyShootTimer: Timer?
     private var shieldTimer: Timer?
-    private var shieldCooldownTimer: Timer?
     private var enemyShipActive = false
+    private var enemyCanShoot = false
+    private var enemyShootDelayTimer: Timer?
     private var isFiring = false
 
     static let shieldDuration: TimeInterval = 2.0
-    static let shieldCooldown: TimeInterval = 5.0
 
     /// Set by the left joystick each drag update. x = turn (-1...1), y = thrust when negative (up).
     var leftJoystickVector: CGVector = .zero
@@ -248,6 +257,11 @@ final class GameState: ObservableObject {
             guard let self = self else { return }
             self.enemySpaceShip = EnemySpaceShip()
             self.enemyShipActive = true
+            self.enemyCanShoot = false
+            self.enemyShootDelayTimer?.invalidate()
+            self.enemyShootDelayTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: false) { [weak self] _ in
+                self?.enemyCanShoot = true
+            }
         }
     }
 
@@ -294,15 +308,13 @@ final class GameState: ObservableObject {
     private func tick() {
         guard !gameOver else { return }
 
-        let turnThreshold: CGFloat = 0.15
-        if leftJoystickVector.dx < -turnThreshold {
-            spaceShip.turnInput = -1
-        } else if leftJoystickVector.dx > turnThreshold {
-            spaceShip.turnInput = 1
-        } else {
-            spaceShip.turnInput = 0
-        }
-        spaceShip.isThrusting = leftJoystickVector.dy < -turnThreshold
+        let deadzone: CGFloat = 0.15
+        let rawTurn = leftJoystickVector.dx
+        spaceShip.turnInput = abs(rawTurn) > deadzone ? Double(max(-1, min(1, rawTurn))) : 0
+
+        // Up on the stick (negative dy) = forward thrust, down (positive dy) = reverse thrust.
+        let rawVertical = -leftJoystickVector.dy
+        spaceShip.thrustAmount = abs(rawVertical) > deadzone ? Double(max(-1, min(1, rawVertical))) : 0
 
         spaceShip.update(gameWidth: gameWidth, gameHeight: gameHeight)
         enemySpaceShip?.update(
@@ -360,23 +372,17 @@ final class GameState: ObservableObject {
     }
 
     func activateShield() {
-        guard !gameOver, !shieldActive, !shieldOnCooldown else { return }
+        guard !gameOver, !shieldActive else { return }
 
         shieldActive = true
         shieldTimer?.invalidate()
         shieldTimer = Timer.scheduledTimer(withTimeInterval: GameState.shieldDuration, repeats: false) { [weak self] _ in
-            guard let self = self else { return }
-            self.shieldActive = false
-            self.shieldOnCooldown = true
-            self.shieldCooldownTimer?.invalidate()
-            self.shieldCooldownTimer = Timer.scheduledTimer(withTimeInterval: GameState.shieldCooldown, repeats: false) { [weak self] _ in
-                self?.shieldOnCooldown = false
-            }
+            self?.shieldActive = false
         }
     }
 
     private func enemyShootLaser() {
-        guard !gameOver, let enemy = enemySpaceShip, enemyShipActive, !enemy.destroyed else { return }
+        guard !gameOver, enemyCanShoot, let enemy = enemySpaceShip, enemyShipActive, !enemy.destroyed else { return }
         let startPosition = CGPoint(
             x: enemy.position.x + CGFloat(cos(enemy.angle)) * 15,
             y: enemy.position.y + CGFloat(sin(enemy.angle)) * 15
@@ -477,6 +483,8 @@ final class GameState: ObservableObject {
         spaceShip = SpaceShip()
         enemySpaceShip = nil
         enemyShipActive = false
+        enemyCanShoot = false
+        enemyShootDelayTimer?.invalidate()
         startEnemyShipDelay()
         spawnAsteroids()
         playerLasers.removeAll()
@@ -484,9 +492,7 @@ final class GameState: ObservableObject {
         score = 0
         gameOver = false
         shieldActive = false
-        shieldOnCooldown = false
         shieldTimer?.invalidate()
-        shieldCooldownTimer?.invalidate()
     }
 
     func stopAll() {
@@ -494,8 +500,8 @@ final class GameState: ObservableObject {
         fireTimer?.invalidate()
         enemyShipDelayTimer?.invalidate()
         enemyShootTimer?.invalidate()
+        enemyShootDelayTimer?.invalidate()
         shieldTimer?.invalidate()
-        shieldCooldownTimer?.invalidate()
     }
 }
 
@@ -630,13 +636,13 @@ struct ContentView: View {
                             Text("Controls:")
                                 .foregroundColor(.white)
                                 .font(.system(size: 16))
-                            Text("Left stick: turn, push up to thrust")
+                            Text("Left stick: turn, up to thrust, down to reverse")
                                 .foregroundColor(.white)
                                 .font(.system(size: 13))
                             Text("Right stick: push to fire")
                                 .foregroundColor(.orange)
                                 .font(.system(size: 13, weight: .bold))
-                            Text("Center: shield (2s, 5s cooldown)")
+                            Text("Center: shield (2s)")
                                 .foregroundColor(.cyan)
                                 .font(.system(size: 13, weight: .bold))
                             Text("Below shield: hold to fire")
@@ -669,7 +675,7 @@ struct ContentView: View {
                         Button(action: { game.activateShield() }) {
                             ZStack {
                                 Circle()
-                                    .fill(Color.cyan.opacity(game.shieldActive ? 0.5 : (game.shieldOnCooldown ? 0.1 : 0.25)))
+                                    .fill(Color.cyan.opacity(game.shieldActive ? 0.5 : 0.25))
                                     .frame(width: 56, height: 56)
                                 Circle()
                                     .strokeBorder(Color.cyan.opacity(0.7), lineWidth: 2)
@@ -679,8 +685,7 @@ struct ContentView: View {
                                     .font(.system(size: 24))
                             }
                         }
-                        .disabled(game.shieldActive || game.shieldOnCooldown)
-                        .opacity(game.shieldOnCooldown ? 0.4 : 1.0)
+                        .disabled(game.shieldActive)
                         .padding(.bottom, 12)
 
                         Button(action: {}) {
@@ -744,6 +749,12 @@ struct ContentView: View {
             flame.move(to: CGPoint(x: -15, y: 0))
             flame.addLine(to: CGPoint(x: -25, y: 0))
             shipContext.stroke(flame, with: .color(.orange), lineWidth: 2)
+        }
+        if game.spaceShip.isReversing {
+            var reverseFlame = Path()
+            reverseFlame.move(to: CGPoint(x: 15, y: 0))
+            reverseFlame.addLine(to: CGPoint(x: 22, y: 0))
+            shipContext.stroke(reverseFlame, with: .color(.cyan), lineWidth: 2)
         }
 
         // Shield shell
