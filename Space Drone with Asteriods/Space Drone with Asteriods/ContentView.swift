@@ -13,10 +13,9 @@ import Combine
 
 // =====================================================================
 // TUBE RUNNER
-// • Infinite tube along +Z; ship near z ≈ 0; world scrolls toward player
-// • Joystick X = slide on circumference; Y = forward speed
-// • Manual FIRE + SHIELD + CANNON AIM
-// • Asteroids / swarm / flock stay inside the tube and BOUNCE off walls
+// • Blue stick: lateral + speed
+// • Red stick: aim cannon + HOLD to rapid-fire
+// • Swarm = alien squid · Flock = deep-ocean alien fish
 // =====================================================================
 
 // MARK: - Tunnel
@@ -32,17 +31,13 @@ enum Tunnel {
     static let defaultSpeed: CGFloat = 6.0
     static let lateralSpeed: Double = 2.4
     static let speedAccel: CGFloat = 12.0
-
-    /// Soft inner floor so entities don't sit on the axis forever.
     static let minRadialOffset: CGFloat = 0.18
-    /// Bounce energy retained (0…1).
     static let wallRestitution: CGFloat = 0.72
 }
 
-// MARK: - Shared radial / wall helpers
+// MARK: - Tube physics
 
 private enum TubePhysics {
-    /// Integrate radial offset and bounce off outer wall + soft inner limit.
     static func integrateRadial(
         radialOffset: inout CGFloat,
         radialVel: inout CGFloat,
@@ -50,29 +45,20 @@ private enum TubePhysics {
         dt: CGFloat
     ) {
         radialOffset += radialVel * dt
-
         let maxOffset = max(Tunnel.minRadialOffset, 1.0 - entityRadius / Tunnel.radius)
         let minOffset = Tunnel.minRadialOffset
-
         if radialOffset >= maxOffset {
             radialOffset = maxOffset
-            if radialVel > 0 {
-                radialVel = -radialVel * Tunnel.wallRestitution
-            }
+            if radialVel > 0 { radialVel = -radialVel * Tunnel.wallRestitution }
         } else if radialOffset <= minOffset {
             radialOffset = minOffset
-            if radialVel < 0 {
-                radialVel = -radialVel * Tunnel.wallRestitution
-            }
+            if radialVel < 0 { radialVel = -radialVel * Tunnel.wallRestitution }
         }
     }
 
-    /// Optional light “slide along wall” damping when pressed against outer wall.
     static func dampAgainstWall(radialOffset: CGFloat, radialVel: inout CGFloat, entityRadius: CGFloat) {
         let maxOffset = max(Tunnel.minRadialOffset, 1.0 - entityRadius / Tunnel.radius)
-        if radialOffset >= maxOffset - 0.02 && radialVel > 0 {
-            radialVel *= 0.5
-        }
+        if radialOffset >= maxOffset - 0.02 && radialVel > 0 { radialVel *= 0.5 }
     }
 }
 
@@ -80,20 +66,18 @@ private enum TubePhysics {
 
 enum AsteroidSize {
     case small, medium, large
-
     var radius: CGFloat {
         switch self {
-        case .small:  return 0.55
+        case .small: return 0.55
         case .medium: return 0.85
-        case .large:  return 1.25
+        case .large: return 1.25
         }
     }
-
     var score: Int {
         switch self {
-        case .small:  return 50
+        case .small: return 50
         case .medium: return 75
-        case .large:  return 100
+        case .large: return 100
         }
     }
 }
@@ -102,50 +86,46 @@ enum AsteroidSize {
 
 struct Laser {
     var lateralAngle: Double
-    var elevationAngle: Double = 0 // Added elevation angle for vertical aiming
+    var elevationAngle: Double
     var z: CGFloat
+    var radialOffset: CGFloat
     let isPlayerLaser: Bool
     static let speed: CGFloat = 28.0
 
     mutating func update(dt: CGFloat, shipSpeed: CGFloat) {
         if isPlayerLaser {
             z += Laser.speed * dt
+            let radialSpeed = CGFloat(sin(elevationAngle)) * Laser.speed * 0.045
+            radialOffset += radialSpeed * dt
+            radialOffset = min(0.98, max(Tunnel.minRadialOffset, radialOffset))
         } else {
             z -= (Laser.speed + shipSpeed) * dt
         }
     }
 
-    /// Player lasers ride the same ring as the ship (cone tip), with elevation.
-    func crossSectionPosition(radiusScale: CGFloat = Tunnel.shipRadialInset) -> SCNVector3 {
-        let r = Float(Tunnel.radius * radiusScale)
-        // Calculate lateral position on circle and apply elevation as vertical offset
-        let x = r * Float(cos(lateralAngle)) * Float(cos(elevationAngle))
-        let y = r * Float(sin(elevationAngle))
-        let zPos = Float(z) + r * Float(sin(lateralAngle)) * Float(cos(elevationAngle))
-        return SCNVector3(x, y, zPos)
+    func worldPosition() -> SCNVector3 {
+        let r = Float(Tunnel.radius * radialOffset)
+        return SCNVector3(
+            r * Float(cos(lateralAngle)),
+            r * Float(sin(lateralAngle)),
+            Float(z)
+        )
     }
 }
 
-// MARK: - Asteroid (bounces off tube wall)
+// MARK: - Asteroid
 
 final class Asteroid {
     var lateralAngle: Double
     var z: CGFloat
     var size: AsteroidSize
-    /// 0…1 fraction of Tunnel.radius
     var radialOffset: CGFloat
     var radialVel: CGFloat
     var angularVel: Double
     var spin: Float = 0
 
-    init(
-        lateralAngle: Double,
-        z: CGFloat,
-        size: AsteroidSize,
-        radialOffset: CGFloat = 0.55,
-        radialVel: CGFloat = 0,
-        angularVel: Double = 0
-    ) {
+    init(lateralAngle: Double, z: CGFloat, size: AsteroidSize,
+         radialOffset: CGFloat = 0.55, radialVel: CGFloat = 0, angularVel: Double = 0) {
         self.lateralAngle = lateralAngle
         self.z = z
         self.size = size
@@ -157,33 +137,18 @@ final class Asteroid {
     func update(dt: CGFloat, shipSpeed: CGFloat) {
         z -= shipSpeed * dt
         spin += Float(dt) * 1.2
-
         lateralAngle += angularVel * Double(dt)
-
-        TubePhysics.integrateRadial(
-            radialOffset: &radialOffset,
-            radialVel: &radialVel,
-            entityRadius: size.radius,
-            dt: dt
-        )
-        TubePhysics.dampAgainstWall(
-            radialOffset: radialOffset,
-            radialVel: &radialVel,
-            entityRadius: size.radius
-        )
-
-        // Mild friction so they don't orbit forever at full speed
+        TubePhysics.integrateRadial(radialOffset: &radialOffset, radialVel: &radialVel,
+                                    entityRadius: size.radius, dt: dt)
+        TubePhysics.dampAgainstWall(radialOffset: radialOffset, radialVel: &radialVel,
+                                    entityRadius: size.radius)
         angularVel *= 0.998
         radialVel *= 0.999
     }
 
     var position: SCNVector3 {
         let r = Float(Tunnel.radius * radialOffset)
-        return SCNVector3(
-            r * Float(cos(lateralAngle)),
-            r * Float(sin(lateralAngle)),
-            Float(z)
-        )
+        return SCNVector3(r * Float(cos(lateralAngle)), r * Float(sin(lateralAngle)), Float(z))
     }
 }
 
@@ -193,34 +158,24 @@ final class SpaceShip {
     var lateralAngle: Double = 0
     var forwardSpeed: CGFloat = Tunnel.defaultSpeed
     var progress: CGFloat = 0
-
     var lateralInput: Double = 0
     var speedInput: Double = 0
 
     func update(dt: CGFloat) {
         lateralAngle += lateralInput * Tunnel.lateralSpeed * Double(dt)
-
         let target = Tunnel.defaultSpeed
             + CGFloat(speedInput) * (Tunnel.maxSpeed - Tunnel.minSpeed) * 0.5
-        let clampedTarget = max(Tunnel.minSpeed, min(Tunnel.maxSpeed, target))
-        let diff = clampedTarget - forwardSpeed
+        let clamped = max(Tunnel.minSpeed, min(Tunnel.maxSpeed, target))
+        let diff = clamped - forwardSpeed
         let step = Tunnel.speedAccel * dt
-        if abs(diff) <= step {
-            forwardSpeed = clampedTarget
-        } else {
-            forwardSpeed += diff > 0 ? step : -step
-        }
-
+        if abs(diff) <= step { forwardSpeed = clamped }
+        else { forwardSpeed += diff > 0 ? step : -step }
         progress += forwardSpeed * dt
     }
 
     var position: SCNVector3 {
         let r = Float(Tunnel.radius * Tunnel.shipRadialInset)
-        return SCNVector3(
-            r * Float(cos(lateralAngle)),
-            r * Float(sin(lateralAngle)),
-            0
-        )
+        return SCNVector3(r * Float(cos(lateralAngle)), r * Float(sin(lateralAngle)), 0)
     }
 }
 
@@ -249,15 +204,11 @@ final class EnemySpaceShip {
 
     var position: SCNVector3 {
         let r = Float(Tunnel.radius * Tunnel.shipRadialInset)
-        return SCNVector3(
-            r * Float(cos(lateralAngle)),
-            r * Float(sin(lateralAngle)),
-            Float(z)
-        )
+        return SCNVector3(r * Float(cos(lateralAngle)), r * Float(sin(lateralAngle)), Float(z))
     }
 }
 
-// MARK: - Swarm alien (CA cluster + wall bounce)
+// MARK: - Swarm = alien squid
 
 final class SwarmAlien {
     var lateralAngle: Double
@@ -266,27 +217,24 @@ final class SwarmAlien {
     var radialOffset: CGFloat
     var radialVel: CGFloat
     var angularVel: Double
-    let bodyRadius: CGFloat = 0.28
+    var animPhase: Float
+    let bodyRadius: CGFloat = 0.32
 
-    init(
-        lateralAngle: Double,
-        z: CGFloat,
-        radialOffset: CGFloat = 0.7,
-        radialVel: CGFloat = 0,
-        angularVel: Double = 0
-    ) {
+    init(lateralAngle: Double, z: CGFloat, radialOffset: CGFloat = 0.7,
+         radialVel: CGFloat = 0, angularVel: Double = 0) {
         self.lateralAngle = lateralAngle
         self.z = z
         self.radialOffset = radialOffset
         self.radialVel = radialVel
         self.angularVel = angularVel
+        self.animPhase = Float.random(in: 0...(Float.pi * 2))
     }
 
     func update(dt: CGFloat, shipSpeed: CGFloat, playerAngle: Double) {
         guard !destroyed else { return }
         z -= shipSpeed * dt
+        animPhase += Float(dt) * 4.5
 
-        // Seek player in angle
         var delta = playerAngle - lateralAngle
         while delta > .pi { delta -= 2 * .pi }
         while delta < -.pi { delta += 2 * .pi }
@@ -294,28 +242,19 @@ final class SwarmAlien {
         angularVel *= 0.94
         lateralAngle += angularVel * Double(dt)
 
-        // Mild radial wander + bounce
         radialVel += CGFloat.random(in: -0.15...0.15) * dt
-        TubePhysics.integrateRadial(
-            radialOffset: &radialOffset,
-            radialVel: &radialVel,
-            entityRadius: bodyRadius,
-            dt: dt
-        )
+        TubePhysics.integrateRadial(radialOffset: &radialOffset, radialVel: &radialVel,
+                                    entityRadius: bodyRadius, dt: dt)
         radialVel *= 0.99
     }
 
     var position: SCNVector3 {
         let r = Float(Tunnel.radius * radialOffset)
-        return SCNVector3(
-            r * Float(cos(lateralAngle)),
-            r * Float(sin(lateralAngle)),
-            Float(z)
-        )
+        return SCNVector3(r * Float(cos(lateralAngle)), r * Float(sin(lateralAngle)), Float(z))
     }
 }
 
-// MARK: - Flock alien (boid-ish + wall bounce)
+// MARK: - Flock = deep ocean alien fish
 
 final class FlockAlien {
     var lateralAngle: Double
@@ -324,25 +263,23 @@ final class FlockAlien {
     var radialOffset: CGFloat
     var radialVel: CGFloat
     var angularVel: Double
-    let bodyRadius: CGFloat = 0.2
+    var animPhase: Float
+    let bodyRadius: CGFloat = 0.22
 
-    init(
-        lateralAngle: Double,
-        z: CGFloat,
-        radialOffset: CGFloat = 0.65,
-        radialVel: CGFloat = 0,
-        angularVel: Double = 0
-    ) {
+    init(lateralAngle: Double, z: CGFloat, radialOffset: CGFloat = 0.65,
+         radialVel: CGFloat = 0, angularVel: Double = 0) {
         self.lateralAngle = lateralAngle
         self.z = z
         self.radialOffset = radialOffset
         self.radialVel = radialVel
         self.angularVel = angularVel
+        self.animPhase = Float.random(in: 0...(Float.pi * 2))
     }
 
     func update(dt: CGFloat, shipSpeed: CGFloat, playerAngle: Double, neighbors: [FlockAlien]) {
         guard !destroyed else { return }
         z -= shipSpeed * dt * 1.05
+        animPhase += Float(dt) * 5.0
 
         var sep: Double = 0
         var cohesionAngle = 0.0
@@ -355,9 +292,7 @@ final class FlockAlien {
             while d < -.pi { d += 2 * .pi }
             let angDist = abs(d)
             if angDist < 0.4 && abs(z - other.z) < 8 {
-                if angDist < 0.22 {
-                    sep += d > 0 ? 1.2 : -1.2
-                }
+                if angDist < 0.22 { sep += d > 0 ? 1.2 : -1.2 }
                 cohesionAngle += other.lateralAngle
                 cohesionRadial += other.radialOffset
                 count += 1
@@ -375,30 +310,19 @@ final class FlockAlien {
             while toCenter > .pi { toCenter -= 2 * .pi }
             while toCenter < -.pi { toCenter += 2 * .pi }
             angularVel += toCenter * 0.25 * Double(dt)
-
-            let avgR = cohesionRadial / CGFloat(count)
-            radialVel += (avgR - radialOffset) * 0.4 * dt
+            radialVel += (cohesionRadial / CGFloat(count) - radialOffset) * 0.4 * dt
         }
 
         angularVel *= 0.93
         lateralAngle += angularVel * Double(dt)
-
-        TubePhysics.integrateRadial(
-            radialOffset: &radialOffset,
-            radialVel: &radialVel,
-            entityRadius: bodyRadius,
-            dt: dt
-        )
+        TubePhysics.integrateRadial(radialOffset: &radialOffset, radialVel: &radialVel,
+                                    entityRadius: bodyRadius, dt: dt)
         radialVel *= 0.985
     }
 
     var position: SCNVector3 {
         let r = Float(Tunnel.radius * radialOffset)
-        return SCNVector3(
-            r * Float(cos(lateralAngle)),
-            r * Float(sin(lateralAngle)),
-            Float(z)
-        )
+        return SCNVector3(r * Float(cos(lateralAngle)), r * Float(sin(lateralAngle)), Float(z))
     }
 }
 
@@ -410,10 +334,7 @@ final class SwarmManager {
     private let spawnInterval: CGFloat = 2.8
     private let maxPopulation = 28
 
-    func reset() {
-        aliens.removeAll()
-        spawnClock = 0
-    }
+    func reset() { aliens.removeAll(); spawnClock = 0 }
 
     func update(dt: CGFloat, shipSpeed: CGFloat, playerAngle: Double, progress: CGFloat) {
         spawnClock += dt
@@ -432,9 +353,8 @@ final class SwarmManager {
         let baseZ = CGFloat.random(in: 45...70)
         let baseAngle = Double.random(in: 0..<(2 * .pi))
         for i in 0..<count {
-            let angle = baseAngle + Double(i) * 0.22 + Double.random(in: -0.08...0.08)
             aliens.append(SwarmAlien(
-                lateralAngle: angle,
+                lateralAngle: baseAngle + Double(i) * 0.22 + Double.random(in: -0.08...0.08),
                 z: baseZ + CGFloat.random(in: -4...8),
                 radialOffset: CGFloat.random(in: 0.45...0.8),
                 radialVel: CGFloat.random(in: -0.4...0.4),
@@ -450,10 +370,7 @@ final class FlockManager {
     private let spawnInterval: CGFloat = 3.4
     private let maxPopulation = 16
 
-    func reset() {
-        aliens.removeAll()
-        spawnClock = 0
-    }
+    func reset() { aliens.removeAll(); spawnClock = 0 }
 
     func update(dt: CGFloat, shipSpeed: CGFloat, playerAngle: Double, progress: CGFloat) {
         spawnClock += dt
@@ -484,6 +401,180 @@ final class FlockManager {
     }
 }
 
+// MARK: - Creature meshes (squid + fish)
+
+enum CreatureMesh {
+    /// Alien squid: mantle + glowing eye + trailing tentacles
+    static func makeSquid() -> SCNNode {
+        let root = SCNNode()
+
+        // Mantle (head/body)
+        let mantle = SCNSphere(radius: 0.22)
+        mantle.segmentCount = 16
+        mantle.firstMaterial?.diffuse.contents = UIColor(red: 0.45, green: 0.1, blue: 0.55, alpha: 1)
+        mantle.firstMaterial?.emission.contents = UIColor(red: 0.35, green: 0.0, blue: 0.5, alpha: 1)
+        let mantleNode = SCNNode(geometry: mantle)
+        mantleNode.scale = SCNVector3(1.0, 1.15, 1.35)
+        root.addChildNode(mantleNode)
+
+        // Eye
+        let eye = SCNSphere(radius: 0.07)
+        eye.firstMaterial?.diffuse.contents = UIColor.cyan
+        eye.firstMaterial?.emission.contents = UIColor(red: 0.2, green: 0.9, blue: 1.0, alpha: 1)
+        let eyeNode = SCNNode(geometry: eye)
+        eyeNode.position = SCNVector3(0, 0.06, 0.18)
+        root.addChildNode(eyeNode)
+
+        let pupil = SCNSphere(radius: 0.03)
+        pupil.firstMaterial?.diffuse.contents = UIColor.black
+        let pupilNode = SCNNode(geometry: pupil)
+        pupilNode.position = SCNVector3(0, 0.06, 0.24)
+        root.addChildNode(pupilNode)
+
+        // Tentacles (behind body, along -Z)
+        let tentacleCount = 6
+        for i in 0..<tentacleCount {
+            let angle = Float(i) / Float(tentacleCount) * Float.pi * 2
+            let tent = SCNCylinder(radius: 0.035, height: 0.55)
+            tent.firstMaterial?.diffuse.contents = UIColor(red: 0.55, green: 0.15, blue: 0.7, alpha: 1)
+            tent.firstMaterial?.emission.contents = UIColor(red: 0.25, green: 0.0, blue: 0.4, alpha: 1)
+            let tNode = SCNNode(geometry: tent)
+            tNode.name = "tentacle_\(i)"
+            tNode.eulerAngles.x = .pi / 2
+            tNode.position = SCNVector3(
+                cos(angle) * 0.1,
+                sin(angle) * 0.1,
+                -0.35
+            )
+            // Slight outward splay
+            tNode.eulerAngles.y = angle * 0.15
+            root.addChildNode(tNode)
+        }
+
+        // Face forward down the tube (+Z toward player when approaching? enemies come from +Z)
+        // Body oriented so tentacles trail opposite travel (travel is -Z toward player)
+        root.eulerAngles.x = 0
+        return root
+    }
+
+    /// Deep-ocean alien fish: long body, fins, bioluminescent spots, forked tail
+    static func makeDeepFish() -> SCNNode {
+        let root = SCNNode()
+
+        // Body
+        let body = SCNCapsule(capRadius: 0.1, height: 0.55)
+        body.firstMaterial?.diffuse.contents = UIColor(red: 0.05, green: 0.25, blue: 0.35, alpha: 1)
+        body.firstMaterial?.emission.contents = UIColor(red: 0.0, green: 0.2, blue: 0.35, alpha: 1)
+        let bodyNode = SCNNode(geometry: body)
+        bodyNode.eulerAngles.z = .pi / 2 // long axis along Z
+        bodyNode.eulerAngles.y = .pi / 2
+        // Capsule height along Y; rotate so length is along Z
+        bodyNode.eulerAngles = SCNVector3(Double.pi / 2, 0, 0)
+        root.addChildNode(bodyNode)
+
+        // Head bulb
+        let head = SCNSphere(radius: 0.12)
+        head.firstMaterial?.diffuse.contents = UIColor(red: 0.08, green: 0.3, blue: 0.4, alpha: 1)
+        head.firstMaterial?.emission.contents = UIColor(red: 0.0, green: 0.35, blue: 0.45, alpha: 1)
+        let headNode = SCNNode(geometry: head)
+        headNode.position = SCNVector3(0, 0, 0.28)
+        root.addChildNode(headNode)
+
+        // Glowing lure (angler-style)
+        let lureStem = SCNCylinder(radius: 0.015, height: 0.2)
+        lureStem.firstMaterial?.diffuse.contents = UIColor(red: 0.1, green: 0.4, blue: 0.5, alpha: 1)
+        let stemNode = SCNNode(geometry: lureStem)
+        stemNode.position = SCNVector3(0, 0.12, 0.32)
+        stemNode.eulerAngles.x = -0.6
+        root.addChildNode(stemNode)
+
+        let lure = SCNSphere(radius: 0.045)
+        lure.firstMaterial?.diffuse.contents = UIColor(red: 0.3, green: 1.0, blue: 0.7, alpha: 1)
+        lure.firstMaterial?.emission.contents = UIColor(red: 0.2, green: 1.0, blue: 0.6, alpha: 1)
+        let lureNode = SCNNode(geometry: lure)
+        lureNode.name = "lure"
+        lureNode.position = SCNVector3(0, 0.2, 0.38)
+        root.addChildNode(lureNode)
+
+        // Eyes
+        let eyeMat = UIColor(red: 1.0, green: 0.85, blue: 0.2, alpha: 1)
+        for side: Float in [-1, 1] {
+            let eye = SCNSphere(radius: 0.035)
+            eye.firstMaterial?.diffuse.contents = eyeMat
+            eye.firstMaterial?.emission.contents = eyeMat
+            let e = SCNNode(geometry: eye)
+            e.position = SCNVector3(side * 0.08, 0.04, 0.32)
+            root.addChildNode(e)
+        }
+
+        // Side fins
+        for side: Float in [-1, 1] {
+            let fin = SCNCone(topRadius: 0, bottomRadius: 0.08, height: 0.22)
+            fin.firstMaterial?.diffuse.contents = UIColor(red: 0.1, green: 0.45, blue: 0.55, alpha: 1)
+            fin.firstMaterial?.emission.contents = UIColor(red: 0.0, green: 0.25, blue: 0.35, alpha: 1)
+            let f = SCNNode(geometry: fin)
+            f.name = side < 0 ? "finL" : "finR"
+            f.position = SCNVector3(side * 0.14, 0, 0)
+            f.eulerAngles.z = side * 0.9
+            f.eulerAngles.x = .pi / 2
+            root.addChildNode(f)
+        }
+
+        // Tail (forked via two cones)
+        for side: Float in [-1, 1] {
+            let tail = SCNCone(topRadius: 0, bottomRadius: 0.07, height: 0.2)
+            tail.firstMaterial?.diffuse.contents = UIColor(red: 0.1, green: 0.5, blue: 0.55, alpha: 1)
+            let t = SCNNode(geometry: tail)
+            t.name = "tail_\(side < 0 ? "L" : "R")"
+            t.position = SCNVector3(side * 0.05, 0, -0.38)
+            t.eulerAngles.x = .pi / 2
+            t.eulerAngles.y = side * 0.45
+            root.addChildNode(t)
+        }
+
+        // Bioluminescent spots
+        for i in 0..<4 {
+            let spot = SCNSphere(radius: 0.02)
+            spot.firstMaterial?.emission.contents = UIColor(red: 0.2, green: 0.9, blue: 1.0, alpha: 1)
+            spot.firstMaterial?.diffuse.contents = UIColor.cyan
+            let s = SCNNode(geometry: spot)
+            s.position = SCNVector3(0.06, 0, Float(i) * 0.1 - 0.1)
+            root.addChildNode(s)
+        }
+
+        return root
+    }
+
+    static func animateSquid(_ node: SCNNode, phase: Float) {
+        for child in node.childNodes {
+            guard let name = child.name, name.hasPrefix("tentacle_") else { continue }
+            let idx = Float(name.dropFirst("tentacle_".count)) ?? 0
+            let wave = sin(phase + idx * 0.9) * 0.35
+            child.eulerAngles.x = .pi / 2 + wave
+            child.eulerAngles.z = wave * 0.4
+        }
+    }
+
+    static func animateFish(_ node: SCNNode, phase: Float) {
+        let sway = sin(phase) * 0.25
+        if let finL = node.childNode(withName: "finL", recursively: false) {
+            finL.eulerAngles.z = -0.9 + sway
+        }
+        if let finR = node.childNode(withName: "finR", recursively: false) {
+            finR.eulerAngles.z = 0.9 - sway
+        }
+        for child in node.childNodes {
+            if let name = child.name, name.hasPrefix("tail_") {
+                child.eulerAngles.y = (name.hasSuffix("L") ? -0.45 : 0.45) + sway * 0.5
+            }
+        }
+        if let lure = node.childNode(withName: "lure", recursively: false) {
+            let pulse = 0.85 + 0.15 * sin(phase * 2)
+            lure.scale = SCNVector3(pulse, pulse, pulse)
+        }
+    }
+}
+
 // MARK: - Game State
 
 final class GameState: ObservableObject {
@@ -501,22 +592,18 @@ final class GameState: ObservableObject {
     @Published private(set) var frameTick: Int = 0
     @Published private(set) var shieldActive = false
 
-    // Cannon aim properties (Added)
-    var cannonAzimuth: Double = 0 // left/right (relative to ship facing)
-    var cannonElevation: Double = 0 // up/down, clamp e.g. -0.7...0.7 radians
+    var cannonAzimuth: Double = 0
+    var cannonElevation: Double = 0
+    var joystickVector: CGVector = .zero
 
     private var fireTimer: Timer?
     private var isFiring = false
-
-    var joystickVector: CGVector = .zero
-
     private var gameTimer: Timer?
     private var shieldTimer: Timer?
     private var enemySpawnTimer: Timer?
     private var asteroidSpawnClock: CGFloat = 0
     private let asteroidSpawnInterval: CGFloat = 1.1
     private let dt: CGFloat = 1.0 / 60.0
-
     static let shieldDuration: TimeInterval = 2.0
 
     func start() {
@@ -531,21 +618,18 @@ final class GameState: ObservableObject {
             self?.tick()
         }
     }
+
     func shootLaser() {
         guard !gameOver else { return }
-
-        // Cone height is 0.9, tip points +Z → nose is ~0.45–0.55 in front of ship center
-        let noseZ: CGFloat = 0.55
-
         playerLasers.append(Laser(
             lateralAngle: spaceShip.lateralAngle + cannonAzimuth,
             elevationAngle: cannonElevation,
-            z: noseZ,
+            z: 0.55,
+            radialOffset: Tunnel.shipRadialInset,
             isPlayerLaser: true
         ))
     }
 
-    /// Begin rapid fire (long-press / hold). First shot is immediate.
     func startFiring() {
         guard !gameOver else { return }
         if isFiring { return }
@@ -566,6 +650,7 @@ final class GameState: ObservableObject {
         fireTimer?.invalidate()
         fireTimer = nil
     }
+
     private func scheduleEnemy() {
         enemySpaceShip = nil
         enemySpawnTimer?.invalidate()
@@ -579,14 +664,13 @@ final class GameState: ObservableObject {
     }
 
     private func tick() {
-        guard !gameOver else { return }
+        guard !gameOver else { stopFiring(); return }
 
         let deadzone: CGFloat = 0.12
         let rawX = joystickVector.dx
         spaceShip.lateralInput = abs(rawX) > deadzone ? Double(max(-1, min(1, rawX))) : 0
         let rawY = -joystickVector.dy
         spaceShip.speedInput = abs(rawY) > deadzone ? Double(max(-1, min(1, rawY))) : 0
-
         spaceShip.update(dt: dt)
 
         asteroidSpawnClock += dt
@@ -594,9 +678,7 @@ final class GameState: ObservableObject {
             asteroidSpawnClock = 0
             spawnAsteroid()
         }
-        for a in asteroids {
-            a.update(dt: dt, shipSpeed: spaceShip.forwardSpeed)
-        }
+        for a in asteroids { a.update(dt: dt, shipSpeed: spaceShip.forwardSpeed) }
         asteroids.removeAll { $0.z < -5 }
 
         if let enemy = enemySpaceShip, !enemy.destroyed {
@@ -605,7 +687,9 @@ final class GameState: ObservableObject {
                 enemy.shootCooldown = CGFloat.random(in: 1.0...2.2)
                 enemyLasers.append(Laser(
                     lateralAngle: enemy.lateralAngle,
+                    elevationAngle: 0,
                     z: enemy.z - 1.5,
+                    radialOffset: Tunnel.shipRadialInset,
                     isPlayerLaser: false
                 ))
             }
@@ -615,43 +699,24 @@ final class GameState: ObservableObject {
             }
         }
 
-        swarmManager.update(
-            dt: dt,
-            shipSpeed: spaceShip.forwardSpeed,
-            playerAngle: spaceShip.lateralAngle,
-            progress: spaceShip.progress
-        )
-        flockManager.update(
-            dt: dt,
-            shipSpeed: spaceShip.forwardSpeed,
-            playerAngle: spaceShip.lateralAngle,
-            progress: spaceShip.progress
-        )
+        swarmManager.update(dt: dt, shipSpeed: spaceShip.forwardSpeed,
+                            playerAngle: spaceShip.lateralAngle, progress: spaceShip.progress)
+        flockManager.update(dt: dt, shipSpeed: spaceShip.forwardSpeed,
+                            playerAngle: spaceShip.lateralAngle, progress: spaceShip.progress)
 
-        for i in playerLasers.indices {
-            playerLasers[i].update(dt: dt, shipSpeed: spaceShip.forwardSpeed)
-        }
-        for i in enemyLasers.indices {
-            enemyLasers[i].update(dt: dt, shipSpeed: spaceShip.forwardSpeed)
-        }
+        for i in playerLasers.indices { playerLasers[i].update(dt: dt, shipSpeed: spaceShip.forwardSpeed) }
+        for i in enemyLasers.indices { enemyLasers[i].update(dt: dt, shipSpeed: spaceShip.forwardSpeed) }
         playerLasers.removeAll { $0.z > 90 || $0.z < -5 }
         enemyLasers.removeAll { $0.z < -5 || $0.z > 90 }
 
         checkCollisions()
         if checkShipCollision() {
             gameOver = true
-        }
-
-        if Int(spaceShip.progress) % 10 == 0 && frameTick % 60 == 0 {
-            score += 1
-        }
-
-        frameTick &+= 1
-        
-        if gameOver {
             stopFiring()
-            return
         }
+
+        if Int(spaceShip.progress) % 10 == 0 && frameTick % 60 == 0 { score += 1 }
+        frameTick &+= 1
     }
 
     private func spawnAsteroid() {
@@ -661,7 +726,6 @@ final class GameState: ObservableObject {
             if r < 0.8 { return .medium }
             return .large
         }()
-        // Leave room so large rocks don't spawn already intersecting the wall
         let maxR = max(Tunnel.minRadialOffset, 1.0 - size.radius / Tunnel.radius - 0.05)
         asteroids.append(Asteroid(
             lateralAngle: Double.random(in: 0..<(2 * .pi)),
@@ -672,7 +736,6 @@ final class GameState: ObservableObject {
             angularVel: Double.random(in: -0.6...0.6)
         ))
     }
-
 
     func activateShield() {
         guard !gameOver, !shieldActive else { return }
@@ -689,12 +752,15 @@ final class GameState: ObservableObject {
         return d
     }
 
-    private func hits(
-        angleA: Double, zA: CGFloat,
-        angleB: Double, zB: CGFloat,
-        angleTol: Double = 0.28,
-        zTol: CGFloat = 1.4
-    ) -> Bool {
+    private func laserHits(laser: Laser, entityAngle: Double, entityZ: CGFloat, entityRadial: CGFloat,
+                           angleTol: Double = 0.32, zTol: CGFloat = 1.6, radialTol: CGFloat = 0.25) -> Bool {
+        abs(laser.z - entityZ) < zTol
+            && angularDistance(laser.lateralAngle, entityAngle) < angleTol
+            && abs(laser.radialOffset - entityRadial) < radialTol
+    }
+
+    private func hits(angleA: Double, zA: CGFloat, angleB: Double, zB: CGFloat,
+                      angleTol: Double = 0.28, zTol: CGFloat = 1.4) -> Bool {
         abs(zA - zB) < zTol && angularDistance(angleA, angleB) < angleTol
     }
 
@@ -706,11 +772,9 @@ final class GameState: ObservableObject {
 
         for (li, laser) in playerLasers.enumerated() {
             for (ai, asteroid) in asteroids.enumerated() {
-                if hits(
-                    angleA: laser.lateralAngle, zA: laser.z,
-                    angleB: asteroid.lateralAngle, zB: asteroid.z,
-                    angleTol: 0.35, zTol: 1.6
-                ) {
+                if laserHits(laser: laser, entityAngle: asteroid.lateralAngle,
+                             entityZ: asteroid.z, entityRadial: asteroid.radialOffset,
+                             angleTol: 0.35, zTol: 1.6, radialTol: 0.28) {
                     removePlayerLaser.insert(li)
                     removeAsteroid.insert(ai)
                     score += asteroid.size.score
@@ -718,9 +782,7 @@ final class GameState: ObservableObject {
                         for _ in 0..<2 {
                             addAsteroids.append(Asteroid(
                                 lateralAngle: asteroid.lateralAngle + Double.random(in: -0.3...0.3),
-                                z: asteroid.z,
-                                size: .small,
-                                radialOffset: asteroid.radialOffset,
+                                z: asteroid.z, size: .small, radialOffset: asteroid.radialOffset,
                                 radialVel: CGFloat.random(in: -0.8...0.8),
                                 angularVel: Double.random(in: -0.8...0.8)
                             ))
@@ -729,22 +791,18 @@ final class GameState: ObservableObject {
                     break
                 }
             }
-
             if let enemy = enemySpaceShip, !enemy.destroyed,
-               hits(angleA: laser.lateralAngle, zA: laser.z,
-                    angleB: enemy.lateralAngle, zB: enemy.z,
-                    angleTol: 0.32, zTol: 1.8) {
+               laserHits(laser: laser, entityAngle: enemy.lateralAngle, entityZ: enemy.z,
+                         entityRadial: Tunnel.shipRadialInset, angleTol: 0.32, zTol: 1.8, radialTol: 0.3) {
                 removePlayerLaser.insert(li)
                 enemy.destroyed = true
                 score += 500
                 enemySpaceShip = nil
                 scheduleEnemy()
             }
-
             for alien in swarmManager.aliens where !alien.destroyed {
-                if hits(angleA: laser.lateralAngle, zA: laser.z,
-                        angleB: alien.lateralAngle, zB: alien.z,
-                        angleTol: 0.3, zTol: 1.5) {
+                if laserHits(laser: laser, entityAngle: alien.lateralAngle, entityZ: alien.z,
+                             entityRadial: alien.radialOffset) {
                     removePlayerLaser.insert(li)
                     alien.destroyed = true
                     score += 75
@@ -752,9 +810,8 @@ final class GameState: ObservableObject {
                 }
             }
             for alien in flockManager.aliens where !alien.destroyed {
-                if hits(angleA: laser.lateralAngle, zA: laser.z,
-                        angleB: alien.lateralAngle, zB: alien.z,
-                        angleTol: 0.3, zTol: 1.5) {
+                if laserHits(laser: laser, entityAngle: alien.lateralAngle, entityZ: alien.z,
+                             entityRadial: alien.radialOffset) {
                     removePlayerLaser.insert(li)
                     alien.destroyed = true
                     score += 60
@@ -765,8 +822,7 @@ final class GameState: ObservableObject {
 
         for (li, laser) in enemyLasers.enumerated() {
             if hits(angleA: laser.lateralAngle, zA: laser.z,
-                    angleB: spaceShip.lateralAngle, zB: 0,
-                    angleTol: 0.3, zTol: 1.4) {
+                    angleB: spaceShip.lateralAngle, zB: 0, angleTol: 0.3, zTol: 1.4) {
                 removeEnemyLaser.insert(li)
                 if !shieldActive { gameOver = true }
             }
@@ -781,27 +837,23 @@ final class GameState: ObservableObject {
     private func checkShipCollision() -> Bool {
         let sa = spaceShip.lateralAngle
         for asteroid in asteroids {
-            if hits(angleA: sa, zA: 0, angleB: asteroid.lateralAngle, zB: asteroid.z,
-                    angleTol: 0.32, zTol: 1.5) {
+            if hits(angleA: sa, zA: 0, angleB: asteroid.lateralAngle, zB: asteroid.z, angleTol: 0.32, zTol: 1.5) {
                 if shieldActive { continue }
                 return true
             }
         }
         if let enemy = enemySpaceShip, !enemy.destroyed,
-           hits(angleA: sa, zA: 0, angleB: enemy.lateralAngle, zB: enemy.z,
-                angleTol: 0.3, zTol: 1.6), !shieldActive {
+           hits(angleA: sa, zA: 0, angleB: enemy.lateralAngle, zB: enemy.z, angleTol: 0.3, zTol: 1.6), !shieldActive {
             return true
         }
         for alien in swarmManager.aliens where !alien.destroyed {
-            if hits(angleA: sa, zA: 0, angleB: alien.lateralAngle, zB: alien.z,
-                    angleTol: 0.28, zTol: 1.3) {
+            if hits(angleA: sa, zA: 0, angleB: alien.lateralAngle, zB: alien.z, angleTol: 0.28, zTol: 1.3) {
                 if shieldActive { alien.destroyed = true; continue }
                 return true
             }
         }
         for alien in flockManager.aliens where !alien.destroyed {
-            if hits(angleA: sa, zA: 0, angleB: alien.lateralAngle, zB: alien.z,
-                    angleTol: 0.28, zTol: 1.3) {
+            if hits(angleA: sa, zA: 0, angleB: alien.lateralAngle, zB: alien.z, angleTol: 0.28, zTol: 1.3) {
                 if shieldActive { alien.destroyed = true; continue }
                 return true
             }
@@ -810,6 +862,7 @@ final class GameState: ObservableObject {
     }
 
     func restart() {
+        stopFiring()
         spaceShip = SpaceShip()
         enemySpaceShip = nil
         asteroids.removeAll()
@@ -822,10 +875,13 @@ final class GameState: ObservableObject {
         shieldActive = false
         shieldTimer?.invalidate()
         asteroidSpawnClock = 0
+        cannonAzimuth = 0
+        cannonElevation = 0
         scheduleEnemy()
     }
 
     func stopAll() {
+        stopFiring()
         gameTimer?.invalidate()
         gameTimer = nil
         shieldTimer?.invalidate()
@@ -843,6 +899,7 @@ final class SceneWorld {
     private let shipMesh = SCNNode()
     private let thrusterFlame = SCNNode()
     private let shieldNode = SCNNode()
+    private let cannonNode = SCNNode()
     private let enemyRoot = SCNNode()
     private let tubeContainer = SCNNode()
     private let asteroidContainer = SCNNode()
@@ -850,12 +907,13 @@ final class SceneWorld {
     private let flockContainer = SCNNode()
     private let laserContainer = SCNNode()
 
-    private let cannonNode = SCNNode() // Added cannon node
-
     private var tubeSegments: [SCNNode] = []
     private var asteroidNodes: [ObjectIdentifier: SCNNode] = [:]
     private var alienNodes: [ObjectIdentifier: SCNNode] = [:]
     private var flockNodes: [ObjectIdentifier: SCNNode] = [:]
+    
+    // In SceneWorld properties — keep:
+    private let cannonBarrel = SCNNode()
 
     init() {
         scene.background.contents = UIColor.black
@@ -901,11 +959,9 @@ final class SceneWorld {
     }
 
     private func makeTubeSegment() -> SCNNode {
-        let geo = SCNTube(
-            innerRadius: CGFloat(Tunnel.radius) - 0.08,
-            outerRadius: CGFloat(Tunnel.radius),
-            height: Tunnel.segmentLength
-        )
+        let geo = SCNTube(innerRadius: CGFloat(Tunnel.radius) - 0.08,
+                          outerRadius: CGFloat(Tunnel.radius),
+                          height: Tunnel.segmentLength)
         geo.firstMaterial?.diffuse.contents = UIColor(red: 0.08, green: 0.1, blue: 0.16, alpha: 1)
         geo.firstMaterial?.emission.contents = UIColor(red: 0.02, green: 0.04, blue: 0.08, alpha: 1)
         geo.firstMaterial?.isDoubleSided = true
@@ -923,15 +979,62 @@ final class SceneWorld {
 
     private func setupCamera() {
         let cam = SCNCamera()
-        cam.zNear = 0.1
+        cam.zNear = 0.05
         cam.zFar = 200
         cam.fieldOfView = 72
         camera.camera = cam
         camera.position = SCNVector3(0, 0.3, -2.8)
-        camera.eulerAngles.y = .pi
+        camera.eulerAngles.y = .pi   // look down +Z
         scene.rootNode.addChildNode(camera)
-    }
 
+        setupCockpitCannon()
+    }
+    private func setupCockpitCannon() {
+        // Pivot at the mount (rotates for aim)
+        cannonNode.position = SCNVector3(0, -0.55, 0.9) // lower-center, in front of camera
+        camera.addChildNode(cannonNode)
+
+        // Mount / base
+        let base = SCNBox(width: 0.35, height: 0.18, length: 0.25, chamferRadius: 0.02)
+        base.firstMaterial?.diffuse.contents = UIColor(white: 0.2, alpha: 1)
+        base.firstMaterial?.emission.contents = UIColor(white: 0.08, alpha: 1)
+        let baseNode = SCNNode(geometry: base)
+        baseNode.position = SCNVector3(0, -0.05, 0)
+        cannonNode.addChildNode(baseNode)
+
+        // Barrel group (tilts with elevation)
+        cannonBarrel.position = SCNVector3(0, 0.05, 0)
+        cannonNode.addChildNode(cannonBarrel)
+
+        let barrel = SCNCylinder(radius: 0.06, height: 0.7)
+        barrel.firstMaterial?.diffuse.contents = UIColor.red
+        barrel.firstMaterial?.emission.contents = UIColor(red: 0.6, green: 0, blue: 0, alpha: 1)
+        let barrelNode = SCNNode(geometry: barrel)
+        // Cylinder along Y → point forward (+Z in camera space after camera yaw)
+        // Camera looks along world +Z; local camera -Z is look direction in default SceneKit,
+        // but we rotated camera Y by π so "forward" is world +Z.
+        barrelNode.eulerAngles.x = .pi / 2
+        barrelNode.position = SCNVector3(0, 0, 0.35)
+        cannonBarrel.addChildNode(barrelNode)
+
+        // Muzzle tip (glow)
+        let muzzle = SCNSphere(radius: 0.07)
+        muzzle.firstMaterial?.diffuse.contents = UIColor.orange
+        muzzle.firstMaterial?.emission.contents = UIColor.orange
+        let muzzleNode = SCNNode(geometry: muzzle)
+        muzzleNode.name = "muzzle"
+        muzzleNode.position = SCNVector3(0, 0, 0.72)
+        cannonBarrel.addChildNode(muzzleNode)
+
+        // Side brackets
+        for side: Float in [-1, 1] {
+            let arm = SCNBox(width: 0.06, height: 0.08, length: 0.3, chamferRadius: 0)
+            arm.firstMaterial?.diffuse.contents = UIColor.darkGray
+            let armNode = SCNNode(geometry: arm)
+            armNode.position = SCNVector3(side * 0.16, 0, 0.1)
+            cannonNode.addChildNode(armNode)
+        }
+    }
     private func setupShip() {
         let bodyGeo = SCNCone(topRadius: 0, bottomRadius: 0.28, height: 0.9)
         bodyGeo.firstMaterial?.diffuse.contents = UIColor.white
@@ -957,13 +1060,12 @@ final class SceneWorld {
         shieldNode.isHidden = true
         shipRoot.addChildNode(shieldNode)
 
-        // Setup cannon node
-        let cannonGeo = SCNCone(topRadius: 0, bottomRadius: 0.12, height: 0.48)
+        let cannonGeo = SCNCone(topRadius: 0, bottomRadius: 0.1, height: 0.4)
         cannonGeo.firstMaterial?.diffuse.contents = UIColor.red
-        cannonGeo.firstMaterial?.emission.contents = UIColor.red
+        cannonGeo.firstMaterial?.emission.contents = UIColor.red.withAlphaComponent(0.5)
         cannonNode.geometry = cannonGeo
         cannonNode.eulerAngles.x = .pi / 2
-        cannonNode.position = SCNVector3(0, 0, 0.45) // tip in front of ship mesh
+        cannonNode.position = SCNVector3(0, 0, 0.5)
         shipRoot.addChildNode(cannonNode)
 
         scene.rootNode.addChildNode(shipRoot)
@@ -994,14 +1096,12 @@ final class SceneWorld {
         thrusterFlame.isHidden = game.spaceShip.forwardSpeed < Tunnel.defaultSpeed + 0.5
         thrusterFlame.scale = SCNVector3(1, 1, Float(min(1.6, game.spaceShip.forwardSpeed / Tunnel.defaultSpeed)))
         shieldNode.isHidden = !game.shieldActive
+        cannonNode.eulerAngles.x = .pi / 2 + Float(game.cannonElevation)
+        cannonNode.eulerAngles.z = Float(game.cannonAzimuth)
 
         camera.eulerAngles.z = Float(game.spaceShip.lateralInput) * 0.12
         camera.position.x = shipPos.x * 0.15
         camera.position.y = shipPos.y * 0.15 + 0.25
-
-        // Update cannon orientation based on cannonAzimuth and cannonElevation + ship lateralAngle
-        cannonNode.eulerAngles.z = Float(game.cannonAzimuth + game.spaceShip.lateralAngle)
-        cannonNode.eulerAngles.y = Float(game.cannonElevation)
 
         if let enemy = game.enemySpaceShip, !enemy.destroyed {
             enemyRoot.isHidden = false
@@ -1011,6 +1111,7 @@ final class SceneWorld {
             enemyRoot.isHidden = true
         }
 
+        // Asteroids
         var seenA = Set<ObjectIdentifier>()
         for asteroid in game.asteroids {
             let id = ObjectIdentifier(asteroid)
@@ -1034,6 +1135,7 @@ final class SceneWorld {
             asteroidNodes.removeValue(forKey: id)
         }
 
+        // Squid swarm
         var seenS = Set<ObjectIdentifier>()
         for alien in game.swarmManager.aliens where !alien.destroyed {
             let id = ObjectIdentifier(alien)
@@ -1042,20 +1144,21 @@ final class SceneWorld {
             if let existing = alienNodes[id] {
                 node = existing
             } else {
-                let geo = SCNSphere(radius: 0.28)
-                geo.firstMaterial?.diffuse.contents = UIColor.purple
-                geo.firstMaterial?.emission.contents = UIColor(red: 0.5, green: 0, blue: 0.65, alpha: 1)
-                node = SCNNode(geometry: geo)
+                node = CreatureMesh.makeSquid()
                 alienContainer.addChildNode(node)
                 alienNodes[id] = node
             }
             node.position = alien.position
+            // Face travel direction (toward player = -Z)
+            node.eulerAngles.y = Float(alien.lateralAngle)
+            CreatureMesh.animateSquid(node, phase: alien.animPhase)
         }
         for (id, node) in alienNodes where !seenS.contains(id) {
             node.removeFromParentNode()
             alienNodes.removeValue(forKey: id)
         }
 
+        // Deep fish flock
         var seenF = Set<ObjectIdentifier>()
         for alien in game.flockManager.aliens where !alien.destroyed {
             let id = ObjectIdentifier(alien)
@@ -1064,22 +1167,20 @@ final class SceneWorld {
             if let existing = flockNodes[id] {
                 node = existing
             } else {
-                let geo = SCNCone(topRadius: 0, bottomRadius: 0.14, height: 0.4)
-                geo.firstMaterial?.diffuse.contents = UIColor.orange
-                geo.firstMaterial?.emission.contents = UIColor(red: 0.6, green: 0.3, blue: 0, alpha: 1)
-                node = SCNNode(geometry: geo)
-                node.eulerAngles.x = .pi / 2
+                node = CreatureMesh.makeDeepFish()
                 flockContainer.addChildNode(node)
                 flockNodes[id] = node
             }
             node.position = alien.position
-            node.eulerAngles.z = Float(alien.lateralAngle)
+            node.eulerAngles.y = Float(alien.lateralAngle)
+            CreatureMesh.animateFish(node, phase: alien.animPhase)
         }
         for (id, node) in flockNodes where !seenF.contains(id) {
             node.removeFromParentNode()
             flockNodes.removeValue(forKey: id)
         }
 
+        // Lasers
         laserContainer.childNodes.forEach { $0.removeFromParentNode() }
         for laser in game.playerLasers {
             laserContainer.addChildNode(makeLaserNode(laser, color: .green))
@@ -1090,12 +1191,13 @@ final class SceneWorld {
     }
 
     private func makeLaserNode(_ laser: Laser, color: UIColor) -> SCNNode {
-        let geo = SCNCylinder(radius: 0.06, height: 0.9)
+        let geo = SCNCylinder(radius: 0.05, height: 0.75)
         geo.firstMaterial?.diffuse.contents = color
         geo.firstMaterial?.emission.contents = color
         let node = SCNNode(geometry: geo)
         node.eulerAngles.x = .pi / 2
-        node.position = laser.crossSectionPosition()
+        node.eulerAngles.y = Float(laser.elevationAngle)
+        node.position = laser.worldPosition()
         return node
     }
 }
@@ -1104,9 +1206,7 @@ final class SceneWorld {
 
 struct SceneKitContainerView: UIViewRepresentable {
     @ObservedObject var game: GameState
-
     func makeCoordinator() -> SceneWorld { SceneWorld() }
-
     func makeUIView(context: Context) -> SCNView {
         let view = SCNView()
         view.scene = context.coordinator.scene
@@ -1116,13 +1216,12 @@ struct SceneKitContainerView: UIViewRepresentable {
         view.autoenablesDefaultLighting = false
         return view
     }
-
     func updateUIView(_ uiView: SCNView, context: Context) {
         context.coordinator.sync(with: game)
     }
 }
 
-// MARK: - Cockpit overlay
+// MARK: - UI chrome
 
 struct CockpitWindowOverlay: View {
     var body: some View {
@@ -1138,8 +1237,7 @@ struct CockpitWindowOverlay: View {
                     .strokeBorder(
                         LinearGradient(
                             colors: [Color(white: 0.3), Color.black, Color(white: 0.12)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+                            startPoint: .topLeading, endPoint: .bottomTrailing
                         ),
                         lineWidth: 22
                     )
@@ -1154,22 +1252,19 @@ struct CockpitWindowOverlay: View {
     }
 }
 
-// MARK: - Radar
-
 struct RadarMapView: View {
     @ObservedObject var game: GameState
     var mapSize: CGFloat = 120
-
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.black.opacity(0.55))
+            RoundedRectangle(cornerRadius: 8).fill(Color.black.opacity(0.55))
             Canvas { context, size in
                 let maxZ: CGFloat = 70
                 func map(angle: Double, z: CGFloat) -> CGPoint {
-                    let x = CGFloat(angle / (2 * .pi)) * size.width
-                    let y = size.height - (max(0, min(maxZ, z)) / maxZ) * size.height
-                    return CGPoint(x: x, y: y)
+                    CGPoint(
+                        x: CGFloat(angle / (2 * .pi)) * size.width,
+                        y: size.height - (max(0, min(maxZ, z)) / maxZ) * size.height
+                    )
                 }
                 for a in game.asteroids {
                     let p = map(angle: a.lateralAngle, z: a.z)
@@ -1181,7 +1276,7 @@ struct RadarMapView: View {
                 }
                 for a in game.flockManager.aliens where !a.destroyed {
                     let p = map(angle: a.lateralAngle, z: a.z)
-                    context.fill(Path(ellipseIn: CGRect(x: p.x - 1.5, y: p.y - 1.5, width: 3, height: 3)), with: .color(.orange))
+                    context.fill(Path(ellipseIn: CGRect(x: p.x - 1.5, y: p.y - 1.5, width: 3, height: 3)), with: .color(.teal))
                 }
                 if let e = game.enemySpaceShip, !e.destroyed {
                     let p = map(angle: e.lateralAngle, z: e.z)
@@ -1191,14 +1286,11 @@ struct RadarMapView: View {
                 context.fill(Path(ellipseIn: CGRect(x: shipP.x - 2.5, y: shipP.y - 2.5, width: 5, height: 5)), with: .color(.cyan))
             }
             .padding(4)
-            RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(Color.white.opacity(0.3), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 8).strokeBorder(Color.white.opacity(0.3), lineWidth: 1)
         }
         .frame(width: mapSize, height: mapSize * 0.85)
     }
 }
-
-// MARK: - Joystick
 
 struct JoystickView: View {
     var diameter: CGFloat = 120
@@ -1206,20 +1298,14 @@ struct JoystickView: View {
     var baseColor: Color = .white
     var onChange: (CGVector) -> Void
     var onEnd: () -> Void
-
     @State private var knobOffset: CGSize = .zero
     @State private var active = false
 
     var body: some View {
         ZStack {
-            Circle()
-                .fill(baseColor.opacity(0.12))
-                .frame(width: diameter, height: diameter)
-            Circle()
-                .strokeBorder(baseColor.opacity(0.35), lineWidth: 2)
-                .frame(width: diameter, height: diameter)
-            Circle()
-                .fill(baseColor.opacity(active ? 0.55 : 0.35))
+            Circle().fill(baseColor.opacity(0.12)).frame(width: diameter, height: diameter)
+            Circle().strokeBorder(baseColor.opacity(0.35), lineWidth: 2).frame(width: diameter, height: diameter)
+            Circle().fill(baseColor.opacity(active ? 0.55 : 0.35))
                 .frame(width: knobDiameter, height: knobDiameter)
                 .offset(knobOffset)
         }
@@ -1241,9 +1327,7 @@ struct JoystickView: View {
                 }
                 .onEnded { _ in
                     active = false
-                    withAnimation(.spring(response: 0.25, dampingFraction: 0.6)) {
-                        knobOffset = .zero
-                    }
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.6)) { knobOffset = .zero }
                     onChange(.zero)
                     onEnd()
                 }
@@ -1251,12 +1335,9 @@ struct JoystickView: View {
     }
 }
 
-// MARK: - Volume
-
 struct VolumeView: View {
     @Binding var volume: Double
     @Environment(\.dismiss) private var dismiss
-
     var body: some View {
         VStack(spacing: 20) {
             Text("Sound Volume").font(.headline)
@@ -1275,64 +1356,42 @@ struct ContentView: View {
     @StateObject private var game = GameState()
     @State private var showVolumeDialog = false
 
-    // Added cannon joystick state
-    @State private var showCannonJoystick = false
-    @State private var cannonJoystickVector = CGVector.zero
-
     var body: some View {
         GeometryReader { geo in
             ZStack {
                 Color.black.ignoresSafeArea()
-
                 SceneKitContainerView(game: game)
                     .ignoresSafeArea()
                     .onAppear { game.start() }
                     .onDisappear { game.stopAll() }
-
                 CockpitWindowOverlay()
 
                 if game.gameOver {
                     VStack(spacing: 16) {
-                        Text("Game Over")
-                            .font(.system(size: 40, weight: .bold))
-                            .foregroundColor(.red)
-                        Text("Score: \(game.score)")
-                            .font(.system(size: 24))
-                            .foregroundColor(.white)
+                        Text("Game Over").font(.system(size: 40, weight: .bold)).foregroundColor(.red)
+                        Text("Score: \(game.score)").font(.system(size: 24)).foregroundColor(.white)
                         Button("Restart") { game.restart() }
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 10)
-                            .background(Color.blue)
-                            .foregroundColor(.white)
-                            .cornerRadius(8)
+                            .padding(.horizontal, 24).padding(.vertical, 10)
+                            .background(Color.blue).foregroundColor(.white).cornerRadius(8)
                     }
                 }
 
                 VStack {
                     HStack(alignment: .top) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Tube Runner")
-                                .foregroundColor(.white)
-                                .font(.system(size: 16, weight: .semibold))
-                            Text("Stick: left/right slide · up/down speed")
-                                .foregroundColor(.white.opacity(0.9))
-                                .font(.system(size: 12))
-                            Text("Hold Fire to rapid-fire · Shield 2s")
-                                .foregroundColor(.cyan)
-                                .font(.system(size: 12, weight: .bold))
-                            Text("Purple = swarm · Orange = flock")
-                                .foregroundColor(.white.opacity(0.65))
-                                .font(.system(size: 11))
-                            Text(String(format: "Speed %.1f  Dist %.0f", game.spaceShip.forwardSpeed, game.spaceShip.progress))
-                                .foregroundColor(.orange)
-                                .font(.system(size: 12, weight: .medium))
+                            Text("Tube Runner").foregroundColor(.white).font(.system(size: 16, weight: .semibold))
+                            Text("Blue: move · Red: aim + hold to fire")
+                                .foregroundColor(.white.opacity(0.9)).font(.system(size: 12))
+                            Text("Purple squid · Teal deep fish · Shield 2s")
+                                .foregroundColor(.cyan).font(.system(size: 12, weight: .bold))
+                            Text(String(format: "Speed %.1f  Dist %.0f",
+                                         game.spaceShip.forwardSpeed, game.spaceShip.progress))
+                                .foregroundColor(.orange).font(.system(size: 12, weight: .medium))
                         }
                         Spacer()
                         VStack(alignment: .trailing, spacing: 8) {
                             Button(action: { showVolumeDialog = true }) {
-                                Image(systemName: "speaker.wave.2.fill")
-                                    .foregroundColor(.white)
-                                    .font(.system(size: 22))
+                                Image(systemName: "speaker.wave.2.fill").foregroundColor(.white).font(.system(size: 22))
                             }
                             RadarMapView(game: game)
                         }
@@ -1344,77 +1403,53 @@ struct ContentView: View {
                 VStack {
                     Spacer()
                     HStack(alignment: .bottom) {
-                        JoystickView(baseColor: .blue, onChange: { v in
-                            game.joystickVector = v
-                        }, onEnd: {
-                            game.joystickVector = .zero
-                        })
-                        .padding(.leading, 28)
-
-                        Spacer()
-
-                        Text("Score: \(game.score)")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(.white)
-
-                        Spacer()
-
-                        VStack(spacing: 14) {
-                            // FIRE — tap = one shot, hold = rapid fire
-                            ZStack {
-                                Circle()
-                                    .fill(Color.red.opacity(0.35))
-                                    .frame(width: 64, height: 64)
-                                Circle()
-                                    .strokeBorder(Color.red.opacity(0.85), lineWidth: 2)
-                                    .frame(width: 64, height: 64)
-                                Text("FIRE")
-                                    .font(.system(size: 13, weight: .bold))
-                                    .foregroundColor(.white)
-
-                                // Cannon joystick shown above fire button when active
-                                if showCannonJoystick {
-                                    JoystickView(
-                                        diameter: 100,
-                                        knobDiameter: 40,
-                                        baseColor: .red,
-                                        onChange: { v in
-                                            cannonJoystickVector = v
-                                        },
-                                        onEnd: {
-                                            cannonJoystickVector = .zero
-                                        }
-                                    )
-                                    .frame(width: 100, height: 100)
-                                    .offset(x: 0, y: -130)
-                                    .zIndex(2)
-                                }
+                        JoystickView(
+                            diameter: 110,
+                            knobDiameter: 48,
+                            baseColor: .red,
+                            onChange: { v in
+                                // Left / right
+                                game.cannonAzimuth = Double(v.dx) * 0.85
+                                // Up / down (stick up = aim up)
+                                game.cannonElevation = max(-0.75, min(0.75, Double(-v.dy) * 0.75))
+                                game.startFiring()
+                            },
+                            onEnd: {
+                                // Keep last aim, or reset — pick one:
+                                // game.cannonAzimuth = 0
+                                // game.cannonElevation = 0
+                                game.stopFiring()
                             }
-                            .contentShape(Circle())
-                            .gesture(
-                                DragGesture(minimumDistance: 0)
-                                    .onChanged { _ in
-                                        if !showCannonJoystick {
-                                            showCannonJoystick = true
-                                        }
-                                    }
-                                    .onEnded { _ in
-                                        showCannonJoystick = false
-                                        game.shootLaser()
-                                    }
+                        )
+                            .padding(.leading, 28)
+                        Spacer()
+                        Text("Score: \(game.score)")
+                            .font(.system(size: 18, weight: .semibold)).foregroundColor(.white)
+                        Spacer()
+                        VStack(spacing: 14) {
+                            // Fire / aim stick — hold to rapid-fire
+                            JoystickView(
+                                diameter: 100,
+                                knobDiameter: 44,
+                                baseColor: .red,
+                                onChange: { v in
+                                    game.cannonAzimuth = Double(v.dx) * 0.8
+                                    game.cannonElevation = max(-0.7, min(0.7, Double(-v.dy) * 0.7))
+                                    game.startFiring()
+                                },
+                                onEnd: {
+                                    game.cannonAzimuth = 0
+                                    game.cannonElevation = 0
+                                    game.stopFiring()
+                                }
                             )
-
                             Button(action: { game.activateShield() }) {
                                 ZStack {
-                                    Circle()
-                                        .fill(Color.cyan.opacity(game.shieldActive ? 0.5 : 0.25))
+                                    Circle().fill(Color.cyan.opacity(game.shieldActive ? 0.5 : 0.25))
                                         .frame(width: 52, height: 52)
-                                    Circle()
-                                        .strokeBorder(Color.cyan.opacity(0.7), lineWidth: 2)
+                                    Circle().strokeBorder(Color.cyan.opacity(0.7), lineWidth: 2)
                                         .frame(width: 52, height: 52)
-                                    Image(systemName: "shield.fill")
-                                        .foregroundColor(.cyan)
-                                        .font(.system(size: 20))
+                                    Image(systemName: "shield.fill").foregroundColor(.cyan).font(.system(size: 20))
                                 }
                             }
                             .disabled(game.shieldActive)
@@ -1424,15 +1459,8 @@ struct ContentView: View {
                     .padding(.bottom, 40)
                 }
             }
-            // Update cannon aiming based on joystick vector changes
-            .onChange(of: cannonJoystickVector) { v in
-                game.cannonAzimuth = Double(v.dx) * 0.8 // limit turn left/right
-                game.cannonElevation = max(-0.7, min(0.7, Double(-v.dy) * 0.7)) // up/down clamp (-0.7 to 0.7 rad)
-            }
         }
-        .sheet(isPresented: $showVolumeDialog) {
-            VolumeView(volume: $game.volume)
-        }
+        .sheet(isPresented: $showVolumeDialog) { VolumeView(volume: $game.volume) }
         .preferredColorScheme(.dark)
         .statusBarHidden()
     }
