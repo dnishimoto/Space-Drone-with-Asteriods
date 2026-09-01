@@ -48,6 +48,8 @@ final class GameState: ObservableObject {
     private let dt: CGFloat = 1.0 / 60.0
     static let shieldDuration: TimeInterval = 2.0
     var pendingExplosions: [ExplosionEvent] = []
+    
+    @Published var playCollisionSound: Bool = true
 
 
     func start() {
