@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		F79A01303044DBD400F14310 /* FlockAlien.swift in Sources */ = {isa = PBXBuildFile; fileRef = F79A012F3044DBD400F14310 /* FlockAlien.swift */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		F7D9535530106AC7009D0539 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -24,6 +28,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		F79A012F3044DBD400F14310 /* FlockAlien.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlockAlien.swift; sourceTree = "<group>"; };
 		F7D9534230106AC6009D0539 /* Space Drone with Asteriods.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Space Drone with Asteriods.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		F7D9535430106AC7009D0539 /* Space Drone with AsteriodsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Space Drone with AsteriodsTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		F7D9535E30106AC8009D0539 /* Space Drone with AsteriodsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Space Drone with AsteriodsUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -75,6 +80,7 @@
 		F7D9533930106AC6009D0539 = {
 			isa = PBXGroup;
 			children = (
+				F79A012F3044DBD400F14310 /* FlockAlien.swift */,
 				F7D9534430106AC6009D0539 /* Space Drone with Asteriods */,
 				F7D9535730106AC7009D0539 /* Space Drone with AsteriodsTests */,
 				F7D9536130106AC8009D0539 /* Space Drone with AsteriodsUITests */,
@@ -236,6 +242,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F79A01303044DBD400F14310 /* FlockAlien.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -400,6 +407,8 @@
 				DEVELOPMENT_TEAM = D79GCWU2TB;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Space Drones with Asteriods";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -432,6 +441,8 @@
 				DEVELOPMENT_TEAM = D79GCWU2TB;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Space Drones with Asteriods";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
