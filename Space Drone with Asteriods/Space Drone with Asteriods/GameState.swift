@@ -22,6 +22,7 @@ final class GameState: ObservableObject {
 
     let swarmManager = SwarmManager()
     let flockManager = FlockManager()
+    let sharkManager = SharkManager()
 
     // ============================================================
     // CANNON

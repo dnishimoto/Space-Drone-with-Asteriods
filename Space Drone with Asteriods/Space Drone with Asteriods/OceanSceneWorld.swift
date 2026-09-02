@@ -15,6 +15,7 @@ final class OceanSceneWorld {
     let scene = SCNScene()
     let camera = SCNNode()
     
+    private var lastSyncTime: TimeInterval = CACurrentMediaTime()
 
     // Camera/HUD-mounted cannon.
     // This belongs ONLY to camera.
@@ -266,254 +267,335 @@ final class OceanSceneWorld {
         scene.rootNode.addChildNode(enemyRoot)
     }
  */
+
+
     func sync(with game: GameState) {
 
-        // Read currentSection first
+        // MARK: - Delta Time
+        //
+        // SharkManager needs a frame delta for spawning and movement.
+        // Clamp the value so a pause/background transition does not
+        // create a giant movement or spawn jump.
+
+        let now = CACurrentMediaTime()
+
+        let rawDT = now - lastSyncTime
+
+        lastSyncTime = now
+
+        let dt = CGFloat(
+            min(
+                max(rawDT, 0.0),
+                0.05
+            )
+        )
+
+
+        // MARK: - Current Section
+
         let currentSection = game.currentSection
 
-        // ============================================================
-        // Scene Background and Fog based on currentSection
-        // ============================================================
+
+        // MARK: - Update Shark Manager
+        //
+        // SharkManager is the ONLY system that creates and updates
+        // sharks.
+        //
+        // It writes directly into:
+        //
+        //     game.sharks
+        //
+        // This renderer does not create sharks itself.
 
         if currentSection == .ocean {
-            // Deep ocean blue background and fog
-            scene.background.contents = UIColor(red: 0.0, green: 0.05, blue: 0.15, alpha: 1)
-            scene.fogColor = UIColor(red: 0.0, green: 0.1, blue: 0.25, alpha: 1)
-            scene.fogStartDistance = 15
-            scene.fogEndDistance = 70
 
-            // Optionally tint or dim the tube segments to bluish
-            for segment in tubeSegments {
-                if let tube = segment.geometry as? SCNTube {
-                    tube.firstMaterial?.diffuse.contents = UIColor(red: 0.02, green: 0.07, blue: 0.12, alpha: 1)
-                    tube.firstMaterial?.emission.contents = UIColor(red: 0.01, green: 0.03, blue: 0.06, alpha: 1)
-                }
-                // Also dim rings if present
-                for child in segment.childNodes {
-                    if let ring = child.geometry as? SCNTorus {
-                        ring.firstMaterial?.diffuse.contents = UIColor.cyan.withAlphaComponent(0.2)
-                        ring.firstMaterial?.emission.contents = UIColor.cyan.withAlphaComponent(0.1)
-                    }
-                }
-            }
-        } else {
-            // Default space background and fog
-            scene.background.contents = UIColor.black
-            scene.fogColor = UIColor(red: 0.02, green: 0.02, blue: 0.06, alpha: 1)
-            scene.fogStartDistance = 25
-            scene.fogEndDistance = 95
-            // Restore tube segment colors
-            for segment in tubeSegments {
-                if let tube = segment.geometry as? SCNTube {
-                    tube.firstMaterial?.diffuse.contents = UIColor(red: 0.08, green: 0.1, blue: 0.16, alpha: 1)
-                    tube.firstMaterial?.emission.contents = UIColor(red: 0.02, green: 0.04, blue: 0.08, alpha: 1)
-                }
-                for child in segment.childNodes {
-                    if let ring = child.geometry as? SCNTorus {
-                        ring.firstMaterial?.diffuse.contents = UIColor.cyan.withAlphaComponent(0.35)
-                        ring.firstMaterial?.emission.contents = UIColor.cyan.withAlphaComponent(0.2)
-                    }
-                }
-            }
+            game.sharkManager.update(
+                game: game,
+                dt: dt
+            )
         }
 
-        // ============================================================
-        // TUNNEL
-        // ============================================================
 
-        let progress = game.spaceShip.progress
+        // MARK: - Ocean / Tunnel Environment
 
-        let segmentShift =
-            progress.truncatingRemainder(
-                dividingBy: Tunnel.segmentLength
+        if currentSection == .ocean {
+
+            // Deep ocean environment.
+            scene.background.contents = UIColor(
+                red: 0.005,
+                green: 0.025,
+                blue: 0.055,
+                alpha: 1.0
             )
 
-        for (i, node) in tubeSegments.enumerated() {
+            scene.fogColor = UIColor(
+                red: 0.005,
+                green: 0.025,
+                blue: 0.055,
+                alpha: 1.0
+            )
 
-            let baseIndex =
-                i - Tunnel.segmentsBehind
+            scene.fogStartDistance = 20.0
+            scene.fogEndDistance = 110.0
 
-            let z =
-                CGFloat(baseIndex) * Tunnel.segmentLength
-                - segmentShift
-                + Tunnel.segmentLength * 0.5
 
-            node.position.z = Float(z)
+            // The ocean is NOT a tube.
+            //
+            // Hide every tunnel segment while the ship is in
+            // the Alien Ocean.
+
+            for segment in tubeSegments {
+                segment.isHidden = true
+            }
+
+        } else {
+
+            // Restore the space/tunnel environment.
+
+            scene.background.contents = UIColor.black
+
+            scene.fogColor = UIColor.black
+
+            scene.fogStartDistance = 25.0
+            scene.fogEndDistance = 95.0
+
+
+            // Tunnel segments can be visible outside the ocean.
+
+            for segment in tubeSegments {
+                segment.isHidden = false
+            }
         }
 
-        // ============================================================
-        // PLAYER SHIP
-        // ============================================================
 
-        let shipPos = game.spaceShip.position
+        // MARK: - Position Tunnel Segments
+        //
+        // Keep tunnel geometry positioned so it is ready when the
+        // game returns to the tunnel.
+        //
+        // They remain hidden during the ocean.
 
-        shipRoot.position = shipPos
+        let shipZ = CGFloat(
+            game.spaceShip.position.z
+        )
 
-        shipRoot.eulerAngles.z =
-            Float(game.spaceShip.lateralAngle)
+        for (index, segment) in tubeSegments.enumerated() {
 
-        thrusterFlame.isHidden =
-            game.spaceShip.forwardSpeed < Tunnel.defaultSpeed + 0.5
+            let segmentOffset =
+                CGFloat(index) *
+                Tunnel.segmentLength
 
-        thrusterFlame.scale = SCNVector3(
-            1,
-            1,
-            Float(
-                min(
-                    1.6,
-                    game.spaceShip.forwardSpeed
-                    / Tunnel.defaultSpeed
+            segment.position = SCNVector3(
+                0,
+                0,
+                Float(
+                    shipZ +
+                    segmentOffset -
+                    Tunnel.segmentLength
                 )
             )
-        )
+        }
 
-        // Set shieldNode visibility based on shield active state
-        shieldNode.isHidden =
-            !game.shieldActive
 
-        // ============================================================
-        // CAMERA
-        // ============================================================
+        // MARK: - Ship Position
 
-        camera.eulerAngles.z =
-            Float(game.spaceShip.lateralInput) * 0.12
+        let shipPosition =
+            game.spaceShip.position
 
-        camera.position.x =
-            shipPos.x * 0.6
+        shipRoot.position = shipPosition
 
-        camera.position.y =
-            shipPos.y * 0.6 + 0.25
 
-        // ============================================================
-        // CANNON AIM
-        //
-        // cannonAzimuth:
-        //     left/right
-        //
-        // cannonElevation:
-        //     up/down
+        // Ship rotation around the tunnel is retained for
+        // compatibility with the tunnel section.
+
+        shipRoot.eulerAngles.z =
+            Float(
+                game.spaceShip.lateralAngle
+            )
+   
+        if currentSection == .ocean {
+
+            // Ocean camera stays level.
+
+            camera.eulerAngles.x = 0
+            camera.eulerAngles.y = .pi
+            camera.eulerAngles.z = 0
+
+            camera.position = SCNVector3(
+                0,
+                0.3,
+                -2.8
+            )
+
+        } else {
+
+            // Tunnel camera.
+
+            camera.eulerAngles.x = 0
+            camera.eulerAngles.y = .pi
+            camera.eulerAngles.z =
+                Float(
+                    -game.spaceShip.lateralAngle
+                )
+
+            camera.position = SCNVector3(
+                0,
+                0.3,
+                -2.8
+            )
+        }
+
+
+        // MARK: - Cannon Aim
+
+        let yaw =
+            Float(
+                game.cannonLateralAngle
+            )
+
+        let pitch =
+            Float(
+                game.cannonElevation
+            )
+
+        cannonBarrelPivot.eulerAngles =
+            SCNVector3(
+                pitch,
+                -yaw,
+                0
+            )
+
+
+        // MARK: - Actual Cannon Muzzle Position
         //
         // IMPORTANT:
-        // SceneKit's local -Z is the cannon's forward direction.
-        //
-        // Do NOT negate yaw here.
-        // ============================================================
+        // Use presentation.worldPosition so the muzzle position
+        // follows the actual rendered cannon hierarchy.
 
-        let yaw = Float(game.cannonAzimuth)
-        let pitch = Float(game.cannonElevation)
-
-        // Keep the camera-mounted cannon root fixed.
-        // Do not rotate cockpitCannonNode for aiming.
-        cockpitCannonNode.eulerAngles = SCNVector3(
-            0,
-            0,
-            0
-        )
-
-        // Rotate the empty rear-end hinge node.
-        //
-        // cannonBarrelPivot is positioned at the rear endpoint of the
-        // cylinder. Because cannonBarrel is offset forward beneath it,
-        // the cylinder now swings from that rear endpoint rather than
-        // rotating about its own center.
-        cannonBarrelPivot.eulerAngles = SCNVector3(
-            pitch,
-            -yaw,
-            0
-        )
-
-        // Do NOT set cannonBarrel.eulerAngles here.
-        //
-        // cannonBarrel keeps its one-time geometry alignment rotation
-        // from setupCockpitCannon():
-        //
-        // cannonBarrel.eulerAngles = SCNVector3(
-        //     -Float.pi / 2.0,
-        //     0,
-        //     0
-        // )
-
-        // Optional: keep a separate ship-mounted cannon synchronized.
-        // This does not affect cockpitCannonNode / cannonBarrelPivot.
-        cannonNode.eulerAngles = SCNVector3(
-            pitch,
-            yaw,
-            0
-        )
-
-        // Read the actual transformed muzzle position after applying
-        // the pivot rotation.
-        let renderedMuzzle = muzzleNode.presentation
+        let muzzleWorldPosition =
+            muzzleNode.presentation.worldPosition
 
         game.cannonMuzzleWorldPosition =
-            renderedMuzzle.worldPosition
+            muzzleWorldPosition
 
-        // In the completed barrel hierarchy, local -Z is the firing
-        // direction. Convert it to a world-space, normalized vector.
-        let localForward = SCNVector3(
-            0,
-            0,
-            -1
-        )
 
-        let worldDirection = renderedMuzzle
-            .convertVector(
-                localForward,
-                to: nil
+        // MARK: - Actual Cannon Direction
+        //
+        // Convert the cannon's local forward vector into world space.
+        //
+        // SceneKit's forward direction is -Z.
+
+        let localForward =
+            SCNVector3(
+                0,
+                0,
+                -1
             )
-            .normalized
 
-        game.cannonWorldDirection =
-            worldDirection
-    
- 
-            
+        let worldForward =
+            muzzleNode.presentation.convertPosition(
+                localForward,
+                to: scene.rootNode
+            )
+
+        let direction =
+            SCNVector3(
+                worldForward.x -
+                    muzzleWorldPosition.x,
+
+                worldForward.y -
+                    muzzleWorldPosition.y,
+
+                worldForward.z -
+                    muzzleWorldPosition.z
+            )
+
+        let directionLength =
+            sqrt(
+                direction.x * direction.x +
+                direction.y * direction.y +
+                direction.z * direction.z
+            )
+
+        if directionLength > 0.0001 {
+
+            game.cannonWorldDirection =
+                SCNVector3(
+                    direction.x / directionLength,
+                    direction.y / directionLength,
+                    direction.z / directionLength
+                )
+        }
 
 
-            var seenA = Set<ObjectIdentifier>()
+        // MARK: - Asteroids
 
-            for asteroid in game.asteroids {
+        var seenAsteroids =
+            Set<ObjectIdentifier>()
 
-                let id = ObjectIdentifier(asteroid)
+        for asteroid in game.asteroids {
 
-                seenA.insert(id)
+            let id =
+                ObjectIdentifier(asteroid)
 
-                let node: SCNNode
+            seenAsteroids.insert(id)
 
-                if let existing = asteroidNodes[id] {
+            let node: SCNNode
 
-                    node = existing
+            if let existing =
+                asteroidNodes[id] {
 
-                } else {
+                node = existing
 
-                    let geo = SCNSphere(
-                        radius: asteroid.size.radius
+            } else {
+
+                node =
+                    makeAsteroidNode(
+                        asteroid: asteroid
                     )
 
-                    geo.firstMaterial?.diffuse.contents =
-                        UIColor.darkGray
+                asteroidContainer.addChildNode(
+                    node
+                )
 
-                    geo.firstMaterial?.emission.contents =
-                        UIColor(white: 0.1, alpha: 1)
-
-                    node = SCNNode(
-                        geometry: geo
-                    )
-
-                    asteroidContainer.addChildNode(node)
-
-                    asteroidNodes[id] = node
-                }
-
-                node.position =
-                    asteroid.position
-
-                node.eulerAngles.y =
-                    asteroid.spin
+                asteroidNodes[id] = node
             }
 
-            for (id, node) in asteroidNodes
-                where !seenA.contains(id) {
+
+            // Ocean asteroids use true 3D ocean coordinates.
+            //
+            // Tunnel asteroids use cylindrical tunnel coordinates.
+
+            if currentSection == .ocean {
+
+                node.position =
+                    asteroid.oceanPosition
+
+            } else {
+
+                node.position =
+                    asteroid.tunnelPosition
+            }
+
+
+            // Rotate asteroid.
+
+            node.eulerAngles.x =
+                asteroid.spin
+
+            node.eulerAngles.y =
+                asteroid.spin * 0.73
+
+            node.eulerAngles.z =
+                asteroid.spin * 0.41
+        }
+
+
+        // Remove asteroid nodes that no longer exist.
+
+        for (id, node) in asteroidNodes {
+
+            if !seenAsteroids.contains(id) {
 
                 node.removeFromParentNode()
 
@@ -521,51 +603,56 @@ final class OceanSceneWorld {
                     forKey: id
                 )
             }
-    
+        }
 
-        // ============================================================
-        // SQUID SWARM
-        // ============================================================
-        // Show squid swarm in ocean section
-        if currentSection == .ocean {
-            var seenS = Set<ObjectIdentifier>()
 
-            for alien in game.swarmManager.aliens
-                where !alien.destroyed {
+        // MARK: - Squid Swarm
 
-                let id = ObjectIdentifier(alien)
+        var seenAliens =
+            Set<ObjectIdentifier>()
 
-                seenS.insert(id)
+        for alien in game.swarmManager.aliens {
 
-                let node: SCNNode
+            let id =
+                ObjectIdentifier(alien)
 
-                if let existing = alienNodes[id] {
+            seenAliens.insert(id)
 
-                    node = existing
+            let node: SCNNode
 
-                } else {
+            if let existing =
+                alienNodes[id] {
 
-                    node = CreatureMesh.makeSquid()
+                node = existing
 
-                    alienContainer.addChildNode(node)
+            } else {
 
-                    alienNodes[id] = node
-                }
+                node =
+                    CreatureMesh.makeSquid()
 
-                node.position =
-                    alien.position
-
-                node.eulerAngles.y =
-                    Float(alien.lateralAngle)
-
-                CreatureMesh.animateSquid(
-                    node,
-                    phase: alien.animPhase
+                alienContainer.addChildNode(
+                    node
                 )
+
+                alienNodes[id] = node
             }
 
-            for (id, node) in alienNodes
-                where !seenS.contains(id) {
+
+            node.position =
+                alien.position
+
+            CreatureMesh.animateSquid(
+                node,
+                phase: alien.animPhase
+            )
+        }
+
+
+        // Remove old squid nodes.
+
+        for (id, node) in alienNodes {
+
+            if !seenAliens.contains(id) {
 
                 node.removeFromParentNode()
 
@@ -573,57 +660,56 @@ final class OceanSceneWorld {
                     forKey: id
                 )
             }
-        } else {
-            // Remove squid aliens if not ocean section
-            for (_, node) in alienNodes {
-                node.removeFromParentNode()
-            }
-            alienNodes.removeAll()
         }
 
-        // ============================================================
-        // DEEP FISH FLOCK
-        // ============================================================
-        // Show deep fish flock in ocean section
-        if currentSection == .ocean {
-            var seenF = Set<ObjectIdentifier>()
 
-            for alien in game.flockManager.aliens
-                where !alien.destroyed {
+        // MARK: - Fish Flock
 
-                let id = ObjectIdentifier(alien)
+        var seenFish =
+            Set<ObjectIdentifier>()
 
-                seenF.insert(id)
+        for fish in game.flockManager.aliens {
 
-                let node: SCNNode
+            let id =
+                ObjectIdentifier(fish)
 
-                if let existing = flockNodes[id] {
+            seenFish.insert(id)
 
-                    node = existing
+            let node: SCNNode
 
-                } else {
+            if let existing =
+                flockNodes[id] {
 
-                    node = CreatureMesh.makeDeepFish()
+                node = existing
 
-                    flockContainer.addChildNode(node)
+            } else {
 
-                    flockNodes[id] = node
-                }
+                node =
+                    CreatureMesh.makeShark()
 
-                node.position =
-                    alien.position
-
-                node.eulerAngles.y =
-                    Float(alien.lateralAngle)
-
-                CreatureMesh.animateFish(
-                    node,
-                    phase: alien.animPhase
+                flockContainer.addChildNode(
+                    node
                 )
+
+                flockNodes[id] = node
             }
 
-            for (id, node) in flockNodes
-                where !seenF.contains(id) {
+
+            node.position =
+                fish.position
+
+            CreatureMesh.animateFish(
+                node,
+                phase: fish.animPhase
+            )
+        }
+
+
+        // Remove old fish nodes.
+
+        for (id, node) in flockNodes {
+
+            if !seenFish.contains(id) {
 
                 node.removeFromParentNode()
 
@@ -631,56 +717,114 @@ final class OceanSceneWorld {
                     forKey: id
                 )
             }
-        } else {
-            // Remove fish flock nodes if not ocean section
-            for (_, node) in flockNodes {
-                node.removeFromParentNode()
-            }
-            flockNodes.removeAll()
         }
-        
-        // ============================================================
-        // SHARKS (NEW)
-        // ============================================================
-        // Show sharks only in ocean section
+
+
+        // MARK: - Sharks
+        //
+        // SharkManager has already spawned/updated sharks above.
+        //
+        // Therefore this section ONLY renders:
+        //
+        //     game.sharks
+        //
+        // It does NOT create sharks.
+
         if currentSection == .ocean {
-            var seenSharks = Set<ObjectIdentifier>()
-            for shark in game.sharks where !shark.destroyed {
-                let id = ObjectIdentifier(shark)
+
+            var seenSharks =
+                Set<ObjectIdentifier>()
+
+            for shark in game.sharks
+            where !shark.destroyed {
+
+                let id =
+                    ObjectIdentifier(shark)
+
                 seenSharks.insert(id)
+
                 let node: SCNNode
-                if let existing = sharkNodes[id] {
+
+                if let existing =
+                    sharkNodes[id] {
+
                     node = existing
+
                 } else {
-                    node = CreatureMesh.makeShark()
-                    sharkContainer.addChildNode(node)
+
+                    node =
+                        CreatureMesh.makeShark()
+
+                    sharkContainer.addChildNode(
+                        node
+                    )
+
                     sharkNodes[id] = node
                 }
-                node.position = shark.position
-                node.eulerAngles.y = Float(shark.lateralAngle)
-                CreatureMesh.animateShark(node, phase: shark.animPhase)
+
+
+                // SharkManager owns the shark's actual world position.
+
+                node.position =
+                    shark.position
+
+
+                // Face the direction of travel.
+
+                node.eulerAngles.y =
+                    Float(
+                        shark.lateralAngle
+                    )
+
+
+                // Swimming animation.
+
+                CreatureMesh.animateShark(
+                    node,
+                    phase: shark.animPhase
+                )
             }
-            for (id, node) in sharkNodes where !seenSharks.contains(id) {
-                node.removeFromParentNode()
-                sharkNodes.removeValue(forKey: id)
+
+
+            // Remove shark nodes whose Shark objects
+            // were destroyed or removed by SharkManager.
+
+            for (id, node) in sharkNodes {
+
+                if !seenSharks.contains(id) {
+
+                    node.removeFromParentNode()
+
+                    sharkNodes.removeValue(
+                        forKey: id
+                    )
+                }
             }
+
         } else {
-            // Remove sharks if not ocean section
+
+            // No sharks outside the ocean.
+
             for (_, node) in sharkNodes {
+
                 node.removeFromParentNode()
             }
+
             sharkNodes.removeAll()
         }
 
-        // ============================================================
-        // LASERS
-        // ============================================================
 
+ 
         laserContainer.childNodes.forEach {
             $0.removeFromParentNode()
         }
 
-        for laser in game.playerLasers {
+        // ========================================================
+        // PLAYER LASERS
+        // ========================================================
+
+        for laser
+        in game.playerLasers {
 
             laserContainer.addChildNode(
                 makeLaserNode(
@@ -690,7 +834,12 @@ final class OceanSceneWorld {
             )
         }
 
-        for laser in game.enemyLasers {
+        // ========================================================
+        // ENEMY LASERS
+        // ========================================================
+
+        for laser
+        in game.enemyLasers {
 
             laserContainer.addChildNode(
                 makeLaserNode(
@@ -699,19 +848,14 @@ final class OceanSceneWorld {
                 )
             )
         }
-        
-        // ============================================================
-        // OCEAN-SPECIFIC EFFECTS AND ENTITIES
-        // ============================================================
-        // Future expansion point for ocean scene behaviors, lighting,
-        // particle effects, underwater fog variations, and additional
-        // oceanic creatures or visuals.
 
-        // ============================================================
-        // Explosions
-        // ============================================================
-          processExplosions(game)
+        processExplosions(
+            game
+        )
     }
+
+
+
     private func processExplosions(_ game: GameState) {
 
         guard !game.pendingExplosions.isEmpty else {
@@ -786,7 +930,58 @@ final class OceanSceneWorld {
 
         game.pendingExplosions.removeAll()
     }
+    private func makeAsteroidNode(
+        asteroid: Asteroid
+    ) -> SCNNode {
 
+        let node = SCNNode()
+
+        let radius = asteroid.size.radius
+
+        // Irregular asteroid geometry
+        let geometry = SCNSphere(
+            radius: radius
+        )
+
+        geometry.segmentCount = 12
+
+        let material = SCNMaterial()
+
+        material.diffuse.contents = UIColor(
+            red: 0.28,
+            green: 0.25,
+            blue: 0.22,
+            alpha: 1.0
+        )
+
+     
+        geometry.materials = [
+            material
+        ]
+
+        node.geometry = geometry
+
+        // Slightly irregular scale so the asteroid
+        // does not look perfectly spherical.
+
+        node.scale = SCNVector3(
+            1.0,
+            0.82,
+            1.12
+        )
+
+        // Give every asteroid a stable initial rotation.
+
+        node.eulerAngles = SCNVector3(
+            Float.random(in: 0...(Float.pi * 2)),
+            Float.random(in: 0...(Float.pi * 2)),
+            Float.random(in: 0...(Float.pi * 2))
+        )
+
+        node.name = "asteroid"
+
+        return node
+    }
     private func makeLaserNode(
         _ laser: Laser,
         color: UIColor

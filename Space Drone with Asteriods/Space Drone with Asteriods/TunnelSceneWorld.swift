@@ -685,9 +685,6 @@ final class TunnelSceneWorld {
         )
     }
 
-    // ============================================================
-    // SYNC
-    // ============================================================
 
     func sync(with game: GameState) {
 
@@ -776,25 +773,6 @@ final class TunnelSceneWorld {
         // ========================================================
         // CANNON AIM
         // ========================================================
-        //
-        // cannonAzimuth:
-        //     left / right
-        //
-        // cannonElevation:
-        //     up / down
-        //
-        // IMPORTANT:
-        //
-        // The actual cannon is now controlled by
-        // cannonBarrelPivot.
-        //
-        // The barrel itself retains only its
-        // one-time geometry alignment rotation.
-        //
-        // This means the barrel swings from its
-        // rear hinge rather than rotating around
-        // its center.
-        // ========================================================
 
         let yaw =
             Float(
@@ -817,16 +795,12 @@ final class TunnelSceneWorld {
                 0
             )
 
-        // DO NOT set cannonBarrel.eulerAngles here.
+        // Do not set cannonBarrel.eulerAngles here.
         //
-        // It must retain:
+        // setupCockpitCannon() supplies the barrel's
+        // permanent geometry alignment.
         //
-        // -Float.pi / 2
-        //
-        // from setupCockpitCannon().
-        //
-        // The pivot supplies the actual aiming
-        // rotation.
+        // cannonBarrelPivot controls the actual aiming.
 
         // ========================================================
         // OPTIONAL SHIP CANNON
@@ -842,9 +816,6 @@ final class TunnelSceneWorld {
         // ========================================================
         // ACTUAL MUZZLE WORLD POSITION
         // ========================================================
-        //
-        // Use the presentation node so the position
-        // represents the rendered cannon transform.
 
         let renderedMuzzle =
             muzzleNode.presentation
@@ -854,17 +825,6 @@ final class TunnelSceneWorld {
 
         // ========================================================
         // ACTUAL CANNON WORLD DIRECTION
-        // ========================================================
-        //
-        // CRITICAL:
-        //
-        // Do NOT reconstruct this direction from
-        // cannonAzimuth/cannonElevation.
-        //
-        // Read it from the actual transformed
-        // cannon muzzle.
-        //
-        // The cannon's firing axis is local -Z.
         // ========================================================
 
         let localForward =
@@ -885,10 +845,19 @@ final class TunnelSceneWorld {
         game.cannonWorldDirection =
             worldDirection
 
-  
-
         // ========================================================
         // ASTEROIDS
+        // ========================================================
+        //
+        // AsteroidManager owns:
+        // - spawning
+        // - movement
+        // - tunnel physics
+        // - rotation
+        // - removal
+        //
+        // This renderer only displays the asteroids currently
+        // contained in game.asteroids.
         // ========================================================
 
         var seenA =
@@ -941,12 +910,18 @@ final class TunnelSceneWorld {
                     node
             }
 
+            // IMPORTANT:
+            // Use the explicit tunnel position.
             node.position =
-                asteroid.position
+                asteroid.tunnelPosition
 
             node.eulerAngles.y =
                 asteroid.spin
         }
+
+        // ========================================================
+        // REMOVE ASTEROID NODES NO LONGER IN GAMESTATE
+        // ========================================================
 
         for (id, node)
         in asteroidNodes
@@ -1007,9 +982,14 @@ final class TunnelSceneWorld {
 
             CreatureMesh.animateSquid(
                 node,
-                phase: alien.animPhase
+                phase:
+                    alien.animPhase
             )
         }
+
+        // ========================================================
+        // REMOVE SQUID NODES
+        // ========================================================
 
         for (id, node)
         in alienNodes
@@ -1070,9 +1050,14 @@ final class TunnelSceneWorld {
 
             CreatureMesh.animateFish(
                 node,
-                phase: alien.animPhase
+                phase:
+                    alien.animPhase
             )
         }
+
+        // ========================================================
+        // REMOVE FISH NODES
+        // ========================================================
 
         for (id, node)
         in flockNodes
@@ -1093,7 +1078,9 @@ final class TunnelSceneWorld {
             $0.removeFromParentNode()
         }
 
+        // ========================================================
         // PLAYER LASERS
+        // ========================================================
 
         for laser
         in game.playerLasers {
@@ -1106,7 +1093,9 @@ final class TunnelSceneWorld {
             )
         }
 
+        // ========================================================
         // ENEMY LASERS
+        // ========================================================
 
         for laser
         in game.enemyLasers {
@@ -1127,6 +1116,8 @@ final class TunnelSceneWorld {
             game
         )
     }
+   
+
 
     // ============================================================
     // EXPLOSIONS
