@@ -24,6 +24,11 @@ final class GameState: ObservableObject {
     let flockManager = FlockManager()
     let sharkManager = SharkManager()
 
+    var sharkNodes: [ObjectIdentifier: SCNNode] = [:]
+    var asteroidNodes: [ObjectIdentifier: SCNNode] = [:]
+    var alienNodes: [ObjectIdentifier: SCNNode] = [:]
+    var flockNodes: [ObjectIdentifier: SCNNode] = [:]
+
     // ============================================================
     // CANNON
     // ============================================================
@@ -53,7 +58,8 @@ final class GameState: ObservableObject {
     // GAME
     // ============================================================
 
-    @Published var score = 20_000
+    //@Published var score = 20_000
+    @Published var score = 0
 
     @Published var gameOver = false
 

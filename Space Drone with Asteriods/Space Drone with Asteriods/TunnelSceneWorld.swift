@@ -36,17 +36,9 @@ final class TunnelSceneWorld {
     private let alienContainer = SCNNode()
     private let flockContainer = SCNNode()
     private let laserContainer = SCNNode()
+    private let sharkContainer = SCNNode()
 
     private var tubeSegments: [SCNNode] = []
-
-    private var asteroidNodes:
-        [ObjectIdentifier: SCNNode] = [:]
-
-    private var alienNodes:
-        [ObjectIdentifier: SCNNode] = [:]
-
-    private var flockNodes:
-        [ObjectIdentifier: SCNNode] = [:]
 
     // ============================================================
     // COCKPIT CANNON RIG
@@ -686,107 +678,122 @@ final class TunnelSceneWorld {
     }
 
 
-    func sync(with game: GameState) {
+    func sync(with gameState: GameState) {
 
-        // ========================================================
+        // ============================================================
         // TUNNEL
-        // ========================================================
+        //
+        // Tunnel geometry is visual only.
+        // GameState.currentSection determines whether it is visible.
+        // ============================================================
 
         let progress =
-            game.spaceShip.progress
+            gameState.spaceShip.progress
 
         let segmentShift =
             progress.truncatingRemainder(
-                dividingBy:
-                    Tunnel.segmentLength
+                dividingBy: Tunnel.segmentLength
             )
 
-        for (i, node)
-        in tubeSegments.enumerated() {
+        for (index, node) in tubeSegments.enumerated() {
 
             let baseIndex =
-                i - Tunnel.segmentsBehind
+                index - Tunnel.segmentsBehind
 
             let z =
                 CGFloat(baseIndex)
-                *
-                Tunnel.segmentLength
-                -
-                segmentShift
-                +
-                Tunnel.segmentLength * 0.5
+                * Tunnel.segmentLength
+                - segmentShift
+                + Tunnel.segmentLength * 0.5
 
-            node.position.z =
-                Float(z)
+            node.position.z = Float(z)
+
+            // Alien Ocean has no tube.
+            node.isHidden =
+                gameState.currentSection == .ocean
         }
 
-        // ========================================================
-        // PLAYER SHIP
-        // ========================================================
 
-        let shipPos =
-            game.spaceShip.position
+        // ============================================================
+        // PLAYER SHIP
+        //
+        // GameState.spaceShip is the single source of truth.
+        // ============================================================
+
+        let ship =
+            gameState.spaceShip
+
+        let shipPosition =
+            ship.position
 
         shipRoot.position =
-            shipPos
+            shipPosition
 
         shipRoot.eulerAngles.z =
-            Float(
-                game.spaceShip.lateralAngle
-            )
+            Float(ship.lateralAngle)
+
+
+        // ============================================================
+        // THRUSTER
+        // ============================================================
+
+        let speed =
+            ship.forwardSpeed
 
         thrusterFlame.isHidden =
-            game.spaceShip.forwardSpeed <
-            Tunnel.defaultSpeed + 0.5
+            speed < Tunnel.defaultSpeed + 0.5
+
+        let flameScale =
+            min(
+                CGFloat(1.6),
+                speed / Tunnel.defaultSpeed
+            )
 
         thrusterFlame.scale =
             SCNVector3(
                 1,
                 1,
-                Float(
-                    min(
-                        1.6,
-                        game.spaceShip.forwardSpeed /
-                        Tunnel.defaultSpeed
-                    )
-                )
+                Float(flameScale)
             )
+
+
+        // ============================================================
+        // SHIELD
+        //
+        // GameState.shieldActive controls the visual shield.
+        // ============================================================
 
         shieldNode.isHidden =
-            !game.shieldActive
+            !gameState.shieldActive
 
-        // ========================================================
+
+        // ============================================================
         // CAMERA
-        // ========================================================
+        //
+        // Camera follows the shared GameState ship position/input.
+        // ============================================================
 
         camera.eulerAngles.z =
-            Float(
-                game.spaceShip.lateralInput
-            ) * 0.12
+            Float(ship.lateralInput) * 0.12
 
         camera.position.x =
-            shipPos.x * 0.6
+            shipPosition.x * 0.6
 
         camera.position.y =
-            shipPos.y * 0.6 + 0.25
+            shipPosition.y * 0.6 + 0.25
 
-        // ========================================================
+
+        // ============================================================
         // CANNON AIM
-        // ========================================================
+        //
+        // GameState owns the cannon angles.
+        // ============================================================
 
         let yaw =
-            Float(
-                game.cannonAzimuth
-            )
+            Float(gameState.cannonAzimuth)
 
         let pitch =
-            Float(
-                game.cannonElevation
-            )
-
-        // ========================================================
-        // CANNON REAR HINGE AIM
-        // ========================================================
+            Float(gameState.cannonElevation)
 
         cannonBarrelPivot.eulerAngles =
             SCNVector3(
@@ -795,17 +802,6 @@ final class TunnelSceneWorld {
                 0
             )
 
-        // Do not set cannonBarrel.eulerAngles here.
-        //
-        // setupCockpitCannon() supplies the barrel's
-        // permanent geometry alignment.
-        //
-        // cannonBarrelPivot controls the actual aiming.
-
-        // ========================================================
-        // OPTIONAL SHIP CANNON
-        // ========================================================
-
         cannonNode.eulerAngles =
             SCNVector3(
                 pitch,
@@ -813,19 +809,24 @@ final class TunnelSceneWorld {
                 0
             )
 
-        // ========================================================
+
+        // ============================================================
         // ACTUAL MUZZLE WORLD POSITION
-        // ========================================================
+        //
+        // The rendered SceneKit muzzle determines where the laser
+        // starts.
+        // ============================================================
 
         let renderedMuzzle =
             muzzleNode.presentation
 
-        game.cannonMuzzleWorldPosition =
+        gameState.cannonMuzzleWorldPosition =
             renderedMuzzle.worldPosition
 
-        // ========================================================
+
+        // ============================================================
         // ACTUAL CANNON WORLD DIRECTION
-        // ========================================================
+        // ============================================================
 
         let localForward =
             SCNVector3(
@@ -842,56 +843,49 @@ final class TunnelSceneWorld {
                 )
                 .normalized
 
-        game.cannonWorldDirection =
+        gameState.cannonWorldDirection =
             worldDirection
 
-        // ========================================================
-        // ASTEROIDS
-        // ========================================================
-        //
-        // AsteroidManager owns:
-        // - spawning
-        // - movement
-        // - tunnel physics
-        // - rotation
-        // - removal
-        //
-        // This renderer only displays the asteroids currently
-        // contained in game.asteroids.
-        // ========================================================
 
-        var seenA =
+        // ============================================================
+        // ASTEROIDS
+        //
+        // GameState.asteroids is the ONLY asteroid collection.
+        //
+        // Asteroid spawning/updating is handled by gameplay code.
+        // sync() only creates and updates SceneKit nodes.
+        // ============================================================
+
+        var activeAsteroidIDs =
             Set<ObjectIdentifier>()
 
-        for asteroid
-        in game.asteroids {
+        for asteroid in gameState.asteroids
+        where asteroid.z > -10 {
 
             let id =
-                ObjectIdentifier(
-                    asteroid
-                )
+                ObjectIdentifier(asteroid)
 
-            seenA.insert(id)
+            activeAsteroidIDs.insert(id)
 
             let node: SCNNode
 
             if let existing =
-                asteroidNodes[id] {
+                gameState.asteroidNodes[id] {
 
                 node = existing
 
             } else {
 
-                let geo =
+                let geometry =
                     SCNSphere(
                         radius:
                             asteroid.size.radius
                     )
 
-                geo.firstMaterial?.diffuse.contents =
+                geometry.firstMaterial?.diffuse.contents =
                     UIColor.darkGray
 
-                geo.firstMaterial?.emission.contents =
+                geometry.firstMaterial?.emission.contents =
                     UIColor(
                         white: 0.1,
                         alpha: 1
@@ -899,63 +893,77 @@ final class TunnelSceneWorld {
 
                 node =
                     SCNNode(
-                        geometry: geo
+                        geometry: geometry
                     )
 
                 asteroidContainer.addChildNode(
                     node
                 )
 
-                asteroidNodes[id] =
+                gameState.asteroidNodes[id] =
                     node
             }
 
-            // IMPORTANT:
-            // Use the explicit tunnel position.
-            node.position =
-                asteroid.tunnelPosition
+            if gameState.currentSection == .tunnel {
+
+                node.position =
+                    asteroid.tunnelPosition
+
+            } else {
+
+                node.position =
+                    asteroid.oceanPosition
+            }
 
             node.eulerAngles.y =
                 asteroid.spin
+
+            node.isHidden =
+                false
         }
 
-        // ========================================================
-        // REMOVE ASTEROID NODES NO LONGER IN GAMESTATE
-        // ========================================================
 
-        for (id, node)
-        in asteroidNodes
-        where !seenA.contains(id) {
+        // Remove asteroid nodes no longer active.
+        let staleAsteroidIDs =
+        gameState.asteroidNodes.keys.filter {
+                !activeAsteroidIDs.contains($0)
+            }
 
-            node.removeFromParentNode()
+        for id in staleAsteroidIDs {
 
-            asteroidNodes.removeValue(
+            gameState.asteroidNodes[id]?
+                .removeFromParentNode()
+
+            gameState.asteroidNodes.removeValue(
                 forKey: id
             )
         }
 
-        // ========================================================
-        // SQUID SWARM
-        // ========================================================
 
-        var seenS =
+        // ============================================================
+        // SQUIDS
+        //
+        // SwarmManager owns the squid collection.
+        //
+        // sync() does NOT spawn or update squids.
+        // It only renders the objects supplied by SwarmManager.
+        // ============================================================
+
+        var activeSquidIDs =
             Set<ObjectIdentifier>()
 
-        for alien
-        in game.swarmManager.aliens
-        where !alien.destroyed {
+        for squid in gameState.swarmManager.aliens
+        where !squid.destroyed {
 
             let id =
-                ObjectIdentifier(
-                    alien
-                )
+                ObjectIdentifier(squid)
 
-            seenS.insert(id)
+            activeSquidIDs.insert(id)
 
             let node: SCNNode
 
             if let existing =
-                alienNodes[id] {
+                gameState.alienNodes[id] {
 
                 node = existing
 
@@ -968,62 +976,66 @@ final class TunnelSceneWorld {
                     node
                 )
 
-                alienNodes[id] =
+                gameState.alienNodes[id] =
                     node
             }
 
             node.position =
-                alien.position
+                squid.position
 
             node.eulerAngles.y =
-                Float(
-                    alien.lateralAngle
-                )
+                Float(squid.lateralAngle)
 
             CreatureMesh.animateSquid(
                 node,
-                phase:
-                    alien.animPhase
+                phase: squid.animPhase
             )
+
+            node.isHidden =
+                false
         }
 
-        // ========================================================
-        // REMOVE SQUID NODES
-        // ========================================================
 
-        for (id, node)
-        in alienNodes
-        where !seenS.contains(id) {
+        // Remove inactive squid nodes.
+        let staleSquidIDs =
+        gameState.alienNodes.keys.filter {
+                !activeSquidIDs.contains($0)
+            }
 
-            node.removeFromParentNode()
+        for id in staleSquidIDs {
 
-            alienNodes.removeValue(
+            gameState.alienNodes[id]?
+                .removeFromParentNode()
+
+            gameState.alienNodes.removeValue(
                 forKey: id
             )
         }
 
-        // ========================================================
-        // DEEP FISH FLOCK
-        // ========================================================
 
-        var seenF =
+        // ============================================================
+        // FISH
+        //
+        // FlockManager owns the fish collection.
+        //
+        // sync() does NOT spawn or update fish.
+        // ============================================================
+
+        var activeFishIDs =
             Set<ObjectIdentifier>()
 
-        for alien
-        in game.flockManager.aliens
-        where !alien.destroyed {
+        for fish in gameState.flockManager.aliens
+        where !fish.destroyed {
 
             let id =
-                ObjectIdentifier(
-                    alien
-                )
+                ObjectIdentifier(fish)
 
-            seenF.insert(id)
+            activeFishIDs.insert(id)
 
             let node: SCNNode
 
             if let existing =
-                flockNodes[id] {
+                gameState.flockNodes[id] {
 
                 node = existing
 
@@ -1036,54 +1048,162 @@ final class TunnelSceneWorld {
                     node
                 )
 
-                flockNodes[id] =
+                gameState.flockNodes[id] =
                     node
             }
 
             node.position =
-                alien.position
+                fish.position
 
             node.eulerAngles.y =
-                Float(
-                    alien.lateralAngle
-                )
+                Float(fish.lateralAngle)
 
             CreatureMesh.animateFish(
                 node,
-                phase:
-                    alien.animPhase
+                phase: fish.animPhase
             )
+
+            node.isHidden =
+                false
         }
 
-        // ========================================================
-        // REMOVE FISH NODES
-        // ========================================================
 
-        for (id, node)
-        in flockNodes
-        where !seenF.contains(id) {
+        // Remove inactive fish nodes.
+        let staleFishIDs =
+        gameState.flockNodes.keys.filter {
+                !activeFishIDs.contains($0)
+            }
 
-            node.removeFromParentNode()
+        for id in staleFishIDs {
 
-            flockNodes.removeValue(
+            gameState.flockNodes[id]?
+                .removeFromParentNode()
+
+            gameState.flockNodes.removeValue(
                 forKey: id
             )
         }
 
-        // ========================================================
+
+        // ============================================================
+        // SHARKS
+        //
+        // SharkManager owns spawning/updating the shark collection.
+        //
+        // GameState.sharks contains the sharks maintained by the
+        // SharkManager.
+        //
+        // sync() only renders them.
+        // ============================================================
+
+        var activeSharkIDs =
+            Set<ObjectIdentifier>()
+
+        for shark in gameState.sharks
+        where !shark.destroyed {
+
+            let id =
+                ObjectIdentifier(shark)
+
+            activeSharkIDs.insert(id)
+
+            let node: SCNNode
+
+            if let existing =
+                gameState.sharkNodes[id] {
+
+                node = existing
+
+            } else {
+
+                node =
+                    CreatureMesh.makeShark()
+
+                sharkContainer.addChildNode(
+                    node
+                )
+
+                gameState.sharkNodes[id] =
+                    node
+            }
+
+            node.position =
+                shark.position
+
+            node.eulerAngles.y =
+                Float(shark.lateralAngle)
+
+            CreatureMesh.animateShark(
+                node,
+                phase: shark.animPhase
+            )
+
+            node.isHidden =
+                false
+        }
+
+
+        // Remove inactive shark nodes.
+        let staleSharkIDs =
+        gameState.sharkNodes.keys.filter {
+                !activeSharkIDs.contains($0)
+            }
+
+        for id in staleSharkIDs {
+
+            gameState.sharkNodes[id]?
+                .removeFromParentNode()
+
+            gameState.sharkNodes.removeValue(
+                forKey: id
+            )
+        }
+
+
+        // ============================================================
+        // ENEMY SPACE SHIP
+        //
+        // GameState owns enemySpaceShip.
+        //
+        // The manager/gameplay layer is responsible for creating and
+        // updating the enemy.
+        //
+        // sync() only renders it.
+        // ============================================================
+
+        if let enemy =
+            gameState.enemySpaceShip {
+
+            syncEnemyShip(
+                enemy,
+                game: gameState
+            )
+
+        } else {
+
+            enemyRoot.isHidden =
+                true
+        }
+
+
+        // ============================================================
         // LASERS
-        // ========================================================
+        //
+        // GameState owns both laser collections.
+        //
+        // No laser physics occurs here.
+        // ============================================================
 
         laserContainer.childNodes.forEach {
             $0.removeFromParentNode()
         }
 
-        // ========================================================
-        // PLAYER LASERS
-        // ========================================================
 
-        for laser
-        in game.playerLasers {
+        // ------------------------------------------------------------
+        // PLAYER LASERS
+        // ------------------------------------------------------------
+
+        for laser in gameState.playerLasers {
 
             laserContainer.addChildNode(
                 makeLaserNode(
@@ -1093,12 +1213,12 @@ final class TunnelSceneWorld {
             )
         }
 
-        // ========================================================
-        // ENEMY LASERS
-        // ========================================================
 
-        for laser
-        in game.enemyLasers {
+        // ------------------------------------------------------------
+        // ENEMY LASERS
+        // ------------------------------------------------------------
+
+        for laser in gameState.enemyLasers {
 
             laserContainer.addChildNode(
                 makeLaserNode(
@@ -1108,17 +1228,64 @@ final class TunnelSceneWorld {
             )
         }
 
-        // ========================================================
+
+        // ============================================================
         // EXPLOSIONS
-        // ========================================================
+        //
+        // GameState.pendingExplosions is the event queue.
+        // ============================================================
 
         processExplosions(
-            game
+            gameState
         )
     }
-   
+    private func syncEnemyShip(
+        _ enemy: EnemySpaceShip,
+        game: GameState
+    ) {
 
+        // ============================================================
+        // ENEMY SHIP VISIBILITY
+        // ============================================================
 
+        guard game.currentSection == .tunnel else {
+            enemyRoot.isHidden = true
+            return
+        }
+
+        // GameState owns the enemy ship.
+        // This function only renders it.
+        enemyRoot.isHidden = false
+
+        // ============================================================
+        // ENEMY POSITION
+        // ============================================================
+
+        enemyRoot.position =
+            enemy.position
+
+        // ============================================================
+        // ENEMY ROTATION
+        // ============================================================
+
+        enemyRoot.eulerAngles =
+            SCNVector3(
+                0,
+                0,
+                0
+            )
+
+        // ============================================================
+        // ENEMY SCALE
+        // ============================================================
+
+        enemyRoot.scale =
+            SCNVector3(
+                1,
+                1,
+                1
+            )
+    }
     // ============================================================
     // EXPLOSIONS
     // ============================================================

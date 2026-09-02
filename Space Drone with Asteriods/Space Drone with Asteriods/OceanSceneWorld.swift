@@ -35,12 +35,9 @@ final class OceanSceneWorld {
     
     // Added shark container and dictionary
     private let sharkContainer = SCNNode()
-    private var sharkNodes: [ObjectIdentifier: SCNNode] = [:]
+
 
     private var tubeSegments: [SCNNode] = []
-    private var asteroidNodes: [ObjectIdentifier: SCNNode] = [:]
-    private var alienNodes: [ObjectIdentifier: SCNNode] = [:]
-    private var flockNodes: [ObjectIdentifier: SCNNode] = [:]
 
     // Camera-mounted cockpit cannon rig.
     private let cannonBarrel = SCNNode()
@@ -269,7 +266,7 @@ final class OceanSceneWorld {
  */
 
 
-    func sync(with game: GameState) {
+    func sync(with gameState: GameState) {
 
         // MARK: - Delta Time
         //
@@ -293,7 +290,7 @@ final class OceanSceneWorld {
 
         // MARK: - Current Section
 
-        let currentSection = game.currentSection
+        let currentSection = gameState.currentSection
 
 
         // MARK: - Update Shark Manager
@@ -309,8 +306,8 @@ final class OceanSceneWorld {
 
         if currentSection == .ocean {
 
-            game.sharkManager.update(
-                game: game,
+            gameState.sharkManager.update(
+                game: gameState,
                 dt: dt
             )
         }
@@ -376,7 +373,7 @@ final class OceanSceneWorld {
         // They remain hidden during the ocean.
 
         let shipZ = CGFloat(
-            game.spaceShip.position.z
+            gameState.spaceShip.position.z
         )
 
         for (index, segment) in tubeSegments.enumerated() {
@@ -400,7 +397,7 @@ final class OceanSceneWorld {
         // MARK: - Ship Position
 
         let shipPosition =
-            game.spaceShip.position
+            gameState.spaceShip.position
 
         shipRoot.position = shipPosition
 
@@ -410,7 +407,7 @@ final class OceanSceneWorld {
 
         shipRoot.eulerAngles.z =
             Float(
-                game.spaceShip.lateralAngle
+                gameState.spaceShip.lateralAngle
             )
    
         if currentSection == .ocean {
@@ -435,7 +432,7 @@ final class OceanSceneWorld {
             camera.eulerAngles.y = .pi
             camera.eulerAngles.z =
                 Float(
-                    -game.spaceShip.lateralAngle
+                    -gameState.spaceShip.lateralAngle
                 )
 
             camera.position = SCNVector3(
@@ -450,12 +447,12 @@ final class OceanSceneWorld {
 
         let yaw =
             Float(
-                game.cannonLateralAngle
+                gameState.cannonLateralAngle
             )
 
         let pitch =
             Float(
-                game.cannonElevation
+                gameState.cannonElevation
             )
 
         cannonBarrelPivot.eulerAngles =
@@ -475,7 +472,7 @@ final class OceanSceneWorld {
         let muzzleWorldPosition =
             muzzleNode.presentation.worldPosition
 
-        game.cannonMuzzleWorldPosition =
+        gameState.cannonMuzzleWorldPosition =
             muzzleWorldPosition
 
 
@@ -519,7 +516,7 @@ final class OceanSceneWorld {
 
         if directionLength > 0.0001 {
 
-            game.cannonWorldDirection =
+            gameState.cannonWorldDirection =
                 SCNVector3(
                     direction.x / directionLength,
                     direction.y / directionLength,
@@ -533,7 +530,7 @@ final class OceanSceneWorld {
         var seenAsteroids =
             Set<ObjectIdentifier>()
 
-        for asteroid in game.asteroids {
+        for asteroid in gameState.asteroids {
 
             let id =
                 ObjectIdentifier(asteroid)
@@ -543,7 +540,7 @@ final class OceanSceneWorld {
             let node: SCNNode
 
             if let existing =
-                asteroidNodes[id] {
+                gameState.asteroidNodes[id] {
 
                 node = existing
 
@@ -558,7 +555,7 @@ final class OceanSceneWorld {
                     node
                 )
 
-                asteroidNodes[id] = node
+                gameState.asteroidNodes[id] = node
             }
 
 
@@ -593,13 +590,13 @@ final class OceanSceneWorld {
 
         // Remove asteroid nodes that no longer exist.
 
-        for (id, node) in asteroidNodes {
+        for (id, node) in gameState.asteroidNodes {
 
             if !seenAsteroids.contains(id) {
 
                 node.removeFromParentNode()
 
-                asteroidNodes.removeValue(
+                gameState.asteroidNodes.removeValue(
                     forKey: id
                 )
             }
@@ -611,7 +608,7 @@ final class OceanSceneWorld {
         var seenAliens =
             Set<ObjectIdentifier>()
 
-        for alien in game.swarmManager.aliens {
+        for alien in gameState.swarmManager.aliens {
 
             let id =
                 ObjectIdentifier(alien)
@@ -621,7 +618,7 @@ final class OceanSceneWorld {
             let node: SCNNode
 
             if let existing =
-                alienNodes[id] {
+                gameState.alienNodes[id] {
 
                 node = existing
 
@@ -634,7 +631,7 @@ final class OceanSceneWorld {
                     node
                 )
 
-                alienNodes[id] = node
+                gameState.alienNodes[id] = node
             }
 
 
@@ -650,13 +647,13 @@ final class OceanSceneWorld {
 
         // Remove old squid nodes.
 
-        for (id, node) in alienNodes {
+        for (id, node) in gameState.alienNodes {
 
             if !seenAliens.contains(id) {
 
                 node.removeFromParentNode()
 
-                alienNodes.removeValue(
+                gameState.alienNodes.removeValue(
                     forKey: id
                 )
             }
@@ -668,7 +665,8 @@ final class OceanSceneWorld {
         var seenFish =
             Set<ObjectIdentifier>()
 
-        for fish in game.flockManager.aliens {
+        for fish in gameState.flockManager.aliens
+        where !fish.destroyed {
 
             let id =
                 ObjectIdentifier(fish)
@@ -678,25 +676,28 @@ final class OceanSceneWorld {
             let node: SCNNode
 
             if let existing =
-                flockNodes[id] {
+                gameState.flockNodes[id] {
 
                 node = existing
 
             } else {
 
                 node =
-                    CreatureMesh.makeShark()
+                    CreatureMesh.makeDeepFish()
 
                 flockContainer.addChildNode(
                     node
                 )
 
-                flockNodes[id] = node
+                gameState.flockNodes[id] =
+                    node
             }
-
 
             node.position =
                 fish.position
+
+            node.eulerAngles.y =
+                Float(fish.lateralAngle)
 
             CreatureMesh.animateFish(
                 node,
@@ -704,16 +705,15 @@ final class OceanSceneWorld {
             )
         }
 
-
         // Remove old fish nodes.
 
-        for (id, node) in flockNodes {
+        for (id, node) in gameState.flockNodes {
 
             if !seenFish.contains(id) {
 
                 node.removeFromParentNode()
 
-                flockNodes.removeValue(
+                gameState.flockNodes.removeValue(
                     forKey: id
                 )
             }
@@ -735,7 +735,7 @@ final class OceanSceneWorld {
             var seenSharks =
                 Set<ObjectIdentifier>()
 
-            for shark in game.sharks
+            for shark in gameState.sharks
             where !shark.destroyed {
 
                 let id =
@@ -746,7 +746,7 @@ final class OceanSceneWorld {
                 let node: SCNNode
 
                 if let existing =
-                    sharkNodes[id] {
+                    gameState.sharkNodes[id] {
 
                     node = existing
 
@@ -759,7 +759,7 @@ final class OceanSceneWorld {
                         node
                     )
 
-                    sharkNodes[id] = node
+                    gameState.sharkNodes[id] = node
                 }
 
 
@@ -789,13 +789,13 @@ final class OceanSceneWorld {
             // Remove shark nodes whose Shark objects
             // were destroyed or removed by SharkManager.
 
-            for (id, node) in sharkNodes {
+            for (id, node) in gameState.sharkNodes {
 
                 if !seenSharks.contains(id) {
 
                     node.removeFromParentNode()
 
-                    sharkNodes.removeValue(
+                    gameState.sharkNodes.removeValue(
                         forKey: id
                     )
                 }
@@ -805,12 +805,12 @@ final class OceanSceneWorld {
 
             // No sharks outside the ocean.
 
-            for (_, node) in sharkNodes {
+            for (_, node) in gameState.sharkNodes {
 
                 node.removeFromParentNode()
             }
 
-            sharkNodes.removeAll()
+            gameState.sharkNodes.removeAll()
         }
 
 
@@ -824,7 +824,7 @@ final class OceanSceneWorld {
         // ========================================================
 
         for laser
-        in game.playerLasers {
+                in gameState.playerLasers {
 
             laserContainer.addChildNode(
                 makeLaserNode(
@@ -839,7 +839,7 @@ final class OceanSceneWorld {
         // ========================================================
 
         for laser
-        in game.enemyLasers {
+        in gameState.enemyLasers {
 
             laserContainer.addChildNode(
                 makeLaserNode(
@@ -850,7 +850,7 @@ final class OceanSceneWorld {
         }
 
         processExplosions(
-            game
+            gameState
         )
     }
 
