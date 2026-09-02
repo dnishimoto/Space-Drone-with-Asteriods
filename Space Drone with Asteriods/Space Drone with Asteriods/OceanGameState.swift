@@ -80,11 +80,16 @@ enum OceanGameState {
                 difficulty
         )
 
+        gameState.asteroidManager.update(
+            game: gameState,
+            dt: dt
+        )
+       
         // --------------------------------------------------------
         // SHARKS
         // --------------------------------------------------------
 
-        updateSharks(
+        gameState.sharkManager.update(
             game: gameState,
             dt: dt
         )

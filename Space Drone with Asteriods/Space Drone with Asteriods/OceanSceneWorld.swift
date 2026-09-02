@@ -873,7 +873,10 @@ final class OceanSceneWorld {
 
         let radius = asteroid.size.radius
 
-        // Irregular asteroid geometry
+        // ========================================================
+        // KYROTON METALLIC ASTEROID
+        // ========================================================
+
         let geometry = SCNSphere(
             radius: radius
         )
@@ -882,22 +885,53 @@ final class OceanSceneWorld {
 
         let material = SCNMaterial()
 
+        // Deep Kyroton metallic body
         material.diffuse.contents = UIColor(
-            red: 0.28,
-            green: 0.25,
-            blue: 0.22,
+            red: 0.16,
+            green: 0.20,
+            blue: 0.23,
             alpha: 1.0
         )
 
-     
+        // Subtle cold metallic glow
+        material.emission.contents = UIColor(
+            red: 0.025,
+            green: 0.045,
+            blue: 0.06,
+            alpha: 1.0
+        )
+
+        // Highly metallic surface
+        material.metalness.contents = NSNumber(
+            value: 0.95
+        )
+
+        // Low roughness gives the asteroid a hard,
+        // polished extraterrestrial-metal appearance.
+        material.roughness.contents = NSNumber(
+            value: 0.18
+        )
+
+        // Reflect the surrounding ocean/sky environment.
+        material.reflective.contents = UIColor(
+            white: 0.8,
+            alpha: 1.0
+        )
+
+        material.reflective.contents = UIColor(
+            white: 0.8,
+            alpha: 1.0
+        )
+
         geometry.materials = [
             material
         ]
 
         node.geometry = geometry
 
-        // Slightly irregular scale so the asteroid
-        // does not look perfectly spherical.
+        // ========================================================
+        // IRREGULAR KYROTON SHAPE
+        // ========================================================
 
         node.scale = SCNVector3(
             1.0,
@@ -905,15 +939,14 @@ final class OceanSceneWorld {
             1.12
         )
 
-        // Give every asteroid a stable initial rotation.
-
+        // Stable initial rotation
         node.eulerAngles = SCNVector3(
             Float.random(in: 0...(Float.pi * 2)),
             Float.random(in: 0...(Float.pi * 2)),
             Float.random(in: 0...(Float.pi * 2))
         )
 
-        node.name = "asteroid"
+        node.name = "kyrotonAsteroid"
 
         return node
     }

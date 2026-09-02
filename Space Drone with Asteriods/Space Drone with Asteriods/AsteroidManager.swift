@@ -1,3 +1,11 @@
+
+//
+//  AsteroidManager.swift
+//  Space Drone with Asteriods
+//
+//  Created by David Nishimoto on 8/30/26.
+//
+
 import Foundation
 import SceneKit
 
@@ -9,7 +17,6 @@ final class AsteroidManager {
     // ========================================================
 
     private var tunnelSpawnClock: CGFloat = 0
-
     private let tunnelSpawnInterval: CGFloat = 1.1
 
     // ========================================================
@@ -17,8 +24,7 @@ final class AsteroidManager {
     // ========================================================
 
     private var oceanSpawnClock: CGFloat = 0
-
-    private let oceanSpawnInterval: CGFloat = 0.7 // spawns twice as fast for more asteroids
+    private let oceanSpawnInterval: CGFloat = 0.7
 
     // ========================================================
     // UPDATE
@@ -72,6 +78,10 @@ final class AsteroidManager {
             )
         }
 
+        // ----------------------------------------------------
+        // Update existing tunnel asteroids
+        // ----------------------------------------------------
+
         for asteroid in game.asteroids {
 
             asteroid.updateTunnel(
@@ -81,10 +91,17 @@ final class AsteroidManager {
             )
         }
 
+        // ----------------------------------------------------
+        // Remove asteroids behind the ship
+        // ----------------------------------------------------
+
+        let shipZ =
+            game.spaceShip.z
+
         game.asteroids.removeAll { asteroid in
 
             asteroid.z <
-                game.spaceShip.z - 15.0
+                shipZ - 15.0
         }
     }
 
@@ -96,10 +113,21 @@ final class AsteroidManager {
         game: GameState
     ) {
 
+        let shipZ =
+            game.spaceShip.z
+
+        let spawnDistance =
+            CGFloat.random(
+                in: 30.0...55.0
+            )
+
+        let spawnZ =
+            shipZ +
+            spawnDistance
+
         let angle =
             Double.random(
-                in:
-                    0...(Double.pi * 2.0)
+                in: 0...(Double.pi * 2.0)
             )
 
         let radialOffset =
@@ -116,15 +144,6 @@ final class AsteroidManager {
             Double.random(
                 in: -0.35...0.35
             )
-
-        let spawnDistance =
-            CGFloat.random(
-                in: 30.0...55.0
-            )
-
-        let spawnZ =
-            game.spaceShip.z +
-            spawnDistance
 
         let asteroid =
             Asteroid(
@@ -147,6 +166,10 @@ final class AsteroidManager {
                     angularVelocity
             )
 
+        guard asteroid.z > shipZ else {
+            return
+        }
+
         game.asteroids.append(
             asteroid
         )
@@ -154,13 +177,6 @@ final class AsteroidManager {
 
     // ========================================================
     // OCEAN ASTEROIDS
-    // ========================================================
-    //
-    // Asteroids originate ABOVE the ocean.
-    //
-    // They begin near the cloud ceiling and fall downward.
-    //
-    // Y decreases because gravity is negative.
     // ========================================================
 
     private func updateOcean(
@@ -180,6 +196,10 @@ final class AsteroidManager {
             )
         }
 
+        // ----------------------------------------------------
+        // Update ocean asteroids
+        // ----------------------------------------------------
+
         for asteroid in game.asteroids {
 
             asteroid.updateOcean(
@@ -189,84 +209,127 @@ final class AsteroidManager {
             )
         }
 
-        // Remove asteroids once they have fallen
-        // below the ocean surface or passed the ship.
+        // ----------------------------------------------------
+        // Remove ocean asteroids when:
+        //
+        // 1. They fall below the ocean
+        // 2. They move behind the ship
+        // ----------------------------------------------------
+
+        let shipZ =
+            game.spaceShip.z
 
         game.asteroids.removeAll { asteroid in
 
             asteroid.y < -20.0 ||
-            asteroid.z <
-                game.spaceShip.z - 15.0
+            asteroid.z < shipZ - 15.0
         }
     }
 
     // ========================================================
-    // CREATE FALLING OCEAN ASTEROID
+    // CREATE OCEAN ASTEROID
+    // ========================================================
+    //
+    // Ocean asteroid spawning follows the same basic
+    // positioning concept as the swarm:
+    //
+    //      X = randomized horizontal position
+    //      Y = 18...25
+    //      Z = randomized position ahead of ship
+    //
+    // The asteroid then falls toward the ocean.
+    //
     // ========================================================
 
     private func spawnOceanAsteroid(
         game: GameState
     ) {
+        // ====================================================
+        // CURRENT SHIP POSITION
+        // ====================================================
 
-        // Horizontal position over the ocean.
-        let x =
-            CGFloat.random(
-                in: -7.0...7.0
-            )
+        let shipZ = game.spaceShip.z
 
-        // Start above the ocean.
-        //
-        // This represents the cloud region.
-        let y =
-            CGFloat.random(
-                in: 18.0...22.0
-            )
+        // ====================================================
+        // HORIZONTAL POSITION
+        // ====================================================
 
-        // Always spawn asteroids in front of the ship (never behind).
-        let z =
-            game.spaceShip.z +
-            CGFloat.random(
-                in: 25.0...55.0
-            )
-
-        let asteroid =
-            Asteroid(
-                lateralAngle: 0,
-                z: z,
-
-                size:
-                    randomAsteroidSize(),
-
-                radialOffset: 0,
-                radialVel: 0,
-                angularVel: 0,
-
-                x: x,
-                y: y,
-
-                // Always start with a clear downward velocity.
-                verticalVelocity:
-                    CGFloat.random(
-                        in: -1.1 ... -0.5
-                    ),
-
-                // Asteroid can drift left/right
-                // as it falls.
-                horizontalVelocity:
-                    CGFloat.random(
-                        in: -0.8...0.8
-                    ),
-
-                // Slightly increased gravity for faster drop.
-                oceanGravity:
-                    CGFloat.random(
-                        in: 2.0...3.3
-                    )
-            )
-
-        game.asteroids.append(
-            asteroid
+        let x = CGFloat.random(
+            in: -7.0...7.0
         )
+
+        // ====================================================
+        // STARTING HEIGHT
+        //
+        // Asteroids begin between Y 18 and Y 25.
+        // ====================================================
+
+        let y = CGFloat.random(
+            in: 18.0...25.0
+        )
+
+        // ====================================================
+        // FLOCK-STYLE Z POSITION
+        //
+        // The entire spawn region moves with the ship.
+        //
+        // Every time update() causes a new asteroid to spawn,
+        // its Z is calculated from the ship's CURRENT Z.
+        // ====================================================
+
+        let flockSpawnOffset = CGFloat.random(
+            in: 35.0...65.0
+        )
+
+        let spawnZ = shipZ + flockSpawnOffset
+
+        // ====================================================
+        // DOWNWARD VELOCITY
+        // ====================================================
+
+        let verticalVelocity = CGFloat.random(
+            in: -1.1 ... -0.5
+        )
+
+        // ====================================================
+        // HORIZONTAL DRIFT
+        // ====================================================
+
+        let horizontalVelocity = CGFloat.random(
+            in: -0.8...0.8
+        )
+
+        // ====================================================
+        // GRAVITY
+        // ====================================================
+
+        let oceanGravity = CGFloat.random(
+            in: 2.0...3.3
+        )
+
+        // ====================================================
+        // CREATE ASTEROID
+        // ====================================================
+
+        let asteroid = Asteroid(
+            lateralAngle: 0,
+            z: spawnZ,
+            size: randomAsteroidSize(),
+            radialOffset: 0,
+            radialVel: 0,
+            angularVel: 0,
+            x: x,
+            y: y,
+            verticalVelocity: verticalVelocity,
+            horizontalVelocity: horizontalVelocity,
+            oceanGravity: oceanGravity
+        )
+
+        // ====================================================
+        // ADD TO ACTIVE ASTEROID SWARM
+        // ====================================================
+
+        game.asteroids.append(asteroid)
     }
 
     // ========================================================
@@ -274,7 +337,8 @@ final class AsteroidManager {
     // ========================================================
 
     private func randomAsteroidSize()
-        -> AsteroidSize {
+        -> AsteroidSize
+    {
 
         let value =
             Int.random(
