@@ -199,8 +199,10 @@ enum OceanGameState {
                 where !alien.destroyed {
 
 
-                var radius : CGFloat = 100.0
-                
+                let radius =
+                    Tunnel.radius *
+                    alien.radialOffset
+
                 let position =
                     SCNVector3(
 
@@ -450,3 +452,4 @@ enum OceanGameState {
             0.0
     }
 }
+

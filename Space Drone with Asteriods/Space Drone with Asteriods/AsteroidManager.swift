@@ -1,4 +1,3 @@
-
 import Foundation
 import SceneKit
 
@@ -19,7 +18,7 @@ final class AsteroidManager {
 
     private var oceanSpawnClock: CGFloat = 0
 
-    private let oceanSpawnInterval: CGFloat = 1.4
+    private let oceanSpawnInterval: CGFloat = 0.7 // spawns twice as fast for more asteroids
 
     // ========================================================
     // UPDATE
@@ -195,7 +194,7 @@ final class AsteroidManager {
 
         game.asteroids.removeAll { asteroid in
 
-            asteroid.y < -8.0 ||
+            asteroid.y < -20.0 ||
             asteroid.z <
                 game.spaceShip.z - 15.0
         }
@@ -220,10 +219,10 @@ final class AsteroidManager {
         // This represents the cloud region.
         let y =
             CGFloat.random(
-                in: 10.0...14.0
+                in: 18.0...22.0
             )
 
-        // Spawn ahead of the ship.
+        // Always spawn asteroids in front of the ship (never behind).
         let z =
             game.spaceShip.z +
             CGFloat.random(
@@ -245,10 +244,10 @@ final class AsteroidManager {
                 x: x,
                 y: y,
 
-                // Small initial downward velocity.
+                // Always start with a clear downward velocity.
                 verticalVelocity:
                     CGFloat.random(
-                        in: -1.0...0.0
+                        in: -1.1 ... -0.5
                     ),
 
                 // Asteroid can drift left/right
@@ -258,10 +257,10 @@ final class AsteroidManager {
                         in: -0.8...0.8
                     ),
 
-                // Gravity.
+                // Slightly increased gravity for faster drop.
                 oceanGravity:
                     CGFloat.random(
-                        in: 3.5...5.5
+                        in: 2.0...3.3
                     )
             )
 

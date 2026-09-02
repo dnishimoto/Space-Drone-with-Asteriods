@@ -286,6 +286,9 @@ final class OceanSceneWorld {
                 0.05
             )
         )
+        
+        // Ensure asteroids are created and updated by the AsteroidManager
+        gameState.asteroidManager.update(game: gameState, dt: dt)
 
 
         // MARK: - Current Section
@@ -1002,7 +1005,4 @@ private func rotationFromYAxis(to direction: SCNVector3) -> SCNQuaternion {
         s * 0.5
     )
 }
-
-
-
 
