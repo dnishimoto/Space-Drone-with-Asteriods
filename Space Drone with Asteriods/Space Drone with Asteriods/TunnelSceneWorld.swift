@@ -13,31 +13,27 @@ final class TunnelSceneWorld {
 
     let scene = SCNScene()
     let camera = SCNNode()
-
+    
+    private var lastSyncTime: TimeInterval = CACurrentMediaTime()
     // ============================================================
     // CAMERA / HUD MOUNTED CANNON
     // ============================================================
 
     // This belongs ONLY to the camera.
     private let cockpitCannonNode = SCNNode()
-
+    
     private let shipRoot = SCNNode()
     private let shipMesh = SCNNode()
     private let thrusterFlame = SCNNode()
     private let shieldNode = SCNNode()
-
-    // Optional separate cannon node.
     private let cannonNode = SCNNode()
-
-    private let enemyRoot = SCNNode()
-
-    private let tubeContainer = SCNNode()
     private let asteroidContainer = SCNNode()
     private let alienContainer = SCNNode()
     private let flockContainer = SCNNode()
     private let laserContainer = SCNNode()
     private let sharkContainer = SCNNode()
-
+    private let tubeContainer = SCNNode()
+    private let enemyRoot = SCNNode()
     private var tubeSegments: [SCNNode] = []
 
     // ============================================================
@@ -679,6 +675,19 @@ final class TunnelSceneWorld {
 
 
     func sync(with gameState: GameState) {
+        
+        let now = CACurrentMediaTime()
+
+        let rawDT = now - lastSyncTime
+
+        lastSyncTime = now
+
+        let dt = CGFloat(
+            min(
+                max(rawDT, 0.0),
+                0.05
+            )
+        )
 
         // ============================================================
         // TUNNEL
@@ -940,25 +949,18 @@ final class TunnelSceneWorld {
         }
 
 
-        // ============================================================
-        // SQUIDS
-        //
-        // SwarmManager owns the squid collection.
-        //
-        // sync() does NOT spawn or update squids.
-        // It only renders the objects supplied by SwarmManager.
-        // ============================================================
-
-        var activeSquidIDs =
+        var seenAliens =
             Set<ObjectIdentifier>()
+        
+       
+        
 
-        for squid in gameState.swarmManager.aliens
-        where !squid.destroyed {
+        for alien in gameState.swarmManager.aliens {
 
             let id =
-                ObjectIdentifier(squid)
+                ObjectIdentifier(alien)
 
-            activeSquidIDs.insert(id)
+            seenAliens.insert(id)
 
             let node: SCNNode
 
@@ -976,52 +978,39 @@ final class TunnelSceneWorld {
                     node
                 )
 
-                gameState.alienNodes[id] =
-                    node
+                gameState.alienNodes[id] = node
             }
 
-            node.position =
-                squid.position
 
-            node.eulerAngles.y =
-                Float(squid.lateralAngle)
+            node.position =
+                alien.position
 
             CreatureMesh.animateSquid(
                 node,
-                phase: squid.animPhase
+                phase: alien.animPhase
             )
-
-            node.isHidden =
-                false
         }
 
 
-        // Remove inactive squid nodes.
-        let staleSquidIDs =
-        gameState.alienNodes.keys.filter {
-                !activeSquidIDs.contains($0)
+        // Remove old squid nodes.
+
+        for (id, node) in gameState.alienNodes {
+
+            if !seenAliens.contains(id) {
+
+                node.removeFromParentNode()
+
+                gameState.alienNodes.removeValue(
+                    forKey: id
+                )
             }
-
-        for id in staleSquidIDs {
-
-            gameState.alienNodes[id]?
-                .removeFromParentNode()
-
-            gameState.alienNodes.removeValue(
-                forKey: id
-            )
         }
 
 
-        // ============================================================
-        // FISH
-        //
-        // FlockManager owns the fish collection.
-        //
-        // sync() does NOT spawn or update fish.
-        // ============================================================
+   
+        // MARK: - Fish Flock
 
-        var activeFishIDs =
+        var seenFish =
             Set<ObjectIdentifier>()
 
         for fish in gameState.flockManager.aliens
@@ -1030,7 +1019,7 @@ final class TunnelSceneWorld {
             let id =
                 ObjectIdentifier(fish)
 
-            activeFishIDs.insert(id)
+            seenFish.insert(id)
 
             let node: SCNNode
 
@@ -1062,41 +1051,29 @@ final class TunnelSceneWorld {
                 node,
                 phase: fish.animPhase
             )
-
-            node.isHidden =
-                false
         }
 
+        // Remove old fish nodes.
 
-        // Remove inactive fish nodes.
-        let staleFishIDs =
-        gameState.flockNodes.keys.filter {
-                !activeFishIDs.contains($0)
+        for (id, node) in gameState.flockNodes {
+
+            if !seenFish.contains(id) {
+
+                node.removeFromParentNode()
+
+                gameState.flockNodes.removeValue(
+                    forKey: id
+                )
             }
-
-        for id in staleFishIDs {
-
-            gameState.flockNodes[id]?
-                .removeFromParentNode()
-
-            gameState.flockNodes.removeValue(
-                forKey: id
-            )
         }
-
 
         // ============================================================
         // SHARKS
-        //
-        // SharkManager owns spawning/updating the shark collection.
-        //
-        // GameState.sharks contains the sharks maintained by the
-        // SharkManager.
-        //
-        // sync() only renders them.
+        // SharkManager creates and owns the Shark gameplay objects.
+        // OceanSceneWorld creates and owns only the SceneKit nodes.
         // ============================================================
 
-        var activeSharkIDs =
+        var seenSharks =
             Set<ObjectIdentifier>()
 
         for shark in gameState.sharks
@@ -1105,7 +1082,7 @@ final class TunnelSceneWorld {
             let id =
                 ObjectIdentifier(shark)
 
-            activeSharkIDs.insert(id)
+            seenSharks.insert(id)
 
             let node: SCNNode
 
@@ -1123,30 +1100,43 @@ final class TunnelSceneWorld {
                     node
                 )
 
-                gameState.sharkNodes[id] =
-                    node
+                gameState.sharkNodes[id] = node
             }
+
+            // --------------------------------------------------------
+            // SharkManager controls the actual Shark position.
+            // --------------------------------------------------------
 
             node.position =
                 shark.position
 
+            // --------------------------------------------------------
+            // Face the direction controlled by SharkManager.
+            // --------------------------------------------------------
+
             node.eulerAngles.y =
-                Float(shark.lateralAngle)
+                Float(
+                    shark.lateralAngle
+                )
+
+            // --------------------------------------------------------
+            // Swimming animation.
+            // --------------------------------------------------------
 
             CreatureMesh.animateShark(
                 node,
                 phase: shark.animPhase
             )
-
-            node.isHidden =
-                false
         }
 
+        // ------------------------------------------------------------
+        // Remove visual nodes for sharks that SharkManager removed
+        // or marked as destroyed.
+        // ------------------------------------------------------------
 
-        // Remove inactive shark nodes.
         let staleSharkIDs =
         gameState.sharkNodes.keys.filter {
-                !activeSharkIDs.contains($0)
+                !seenSharks.contains($0)
             }
 
         for id in staleSharkIDs {
@@ -1158,8 +1148,6 @@ final class TunnelSceneWorld {
                 forKey: id
             )
         }
-
-
         // ============================================================
         // ENEMY SPACE SHIP
         //

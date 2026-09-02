@@ -21,7 +21,7 @@ enum TunnelGameState {
     // ============================================================
 
     static func update(
-        game: GameState,
+        gameState: GameState,
         dt: CGFloat
     ) {
 
@@ -29,7 +29,7 @@ enum TunnelGameState {
         // TUNNEL ONLY
         // ============================================================
 
-        guard game.currentSection == .tunnel else {
+        guard gameState.currentSection == .tunnel else {
             return
         }
 
@@ -43,18 +43,18 @@ enum TunnelGameState {
 
             asteroidSpawnClock -= asteroidSpawnInterval
 
-            spawnAsteroid(game: game)
+            spawnAsteroid(game: gameState)
         }
 
         // ============================================================
         // UPDATE TUNNEL ASTEROIDS
         // ============================================================
 
-        for asteroid in game.asteroids {
+        for asteroid in gameState.asteroids {
 
             asteroid.updateTunnel(
                 dt: dt,
-                shipSpeed: game.spaceShip.forwardSpeed
+                shipSpeed: gameState.spaceShip.forwardSpeed
             )
         }
 
@@ -62,7 +62,7 @@ enum TunnelGameState {
         // REMOVE ASTEROIDS THAT PASSED THE PLAYER
         // ============================================================
 
-        game.asteroids.removeAll { asteroid in
+        gameState.asteroids.removeAll { asteroid in
             asteroid.z < -5.0
         }
 
@@ -70,13 +70,13 @@ enum TunnelGameState {
         // ENEMY SPACECRAFT
         // ============================================================
 
-        if let enemy = game.enemySpaceShip,
+        if let enemy = gameState.enemySpaceShip,
            !enemy.destroyed {
 
             enemy.update(
                 dt: dt,
-                shipSpeed: game.spaceShip.forwardSpeed,
-                playerAngle: game.spaceShip.lateralAngle
+                shipSpeed: gameState.spaceShip.forwardSpeed,
+                playerAngle: gameState.spaceShip.lateralAngle
             )
 
             // --------------------------------------------------------
@@ -96,10 +96,10 @@ enum TunnelGameState {
                 let direction =
                     enemyWorldDirectionTowardPlayer(
                         enemy,
-                        game: game
+                        game: gameState
                     )
 
-                game.enemyLasers.append(
+                gameState.enemyLasers.append(
                     Laser(
                         lateralAngle:
                             enemy.lateralAngle,
@@ -134,20 +134,29 @@ enum TunnelGameState {
 
             if enemy.z < -6.0 {
 
-                game.enemySpaceShip = nil
+                gameState.enemySpaceShip = nil
 
                 scheduleEnemy(
-                    game: game
+                    game: gameState
                 )
             }
         }
+        
+        gameState.sharkManager.update(game: gameState, dt: dt)
+        gameState.swarmManager.update(
+            dt: dt,
+            shipSpeed: gameState.spaceShip.forwardSpeed, playerAngle: gameState.spaceShip.lateralAngle, progress: gameState.spaceShip.progress
+           )
+        gameState.flockManager.update(dt:dt,
+                                      shipSpeed: gameState.spaceShip.forwardSpeed, playerAngle: gameState.spaceShip.lateralAngle, progress: gameState.spaceShip.progress)
 
+         
         // ============================================================
         // TUNNEL COLLISIONS
         // ============================================================
 
         checkCollisions(
-            game: game
+            game: gameState
         )
     }
 

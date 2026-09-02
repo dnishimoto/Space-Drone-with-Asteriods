@@ -12,22 +12,19 @@ enum SceneSection {
 final class GameState: ObservableObject {
     
     var enemySpaceShip: EnemySpaceShip? = nil
-    
     var asteroids: [Asteroid] = []
-    
     var playerLasers: [Laser] = []
     var enemyLasers: [Laser] = []
-    
     var sharks: [Shark] = []
+    @Published var  swarmManager : SwarmManager = SwarmManager()
+    @Published var  flockManager : FlockManager = FlockManager()
+    @Published var  sharkManager : SharkManager = SharkManager()
+    @Published var  asteroidManager : AsteroidManager = AsteroidManager()
 
-    let swarmManager = SwarmManager()
-    let flockManager = FlockManager()
-    let sharkManager = SharkManager()
-
-    var sharkNodes: [ObjectIdentifier: SCNNode] = [:]
-    var asteroidNodes: [ObjectIdentifier: SCNNode] = [:]
-    var alienNodes: [ObjectIdentifier: SCNNode] = [:]
-    var flockNodes: [ObjectIdentifier: SCNNode] = [:]
+    @Published var sharkNodes: [ObjectIdentifier: SCNNode] = [:]
+    @Published var asteroidNodes: [ObjectIdentifier: SCNNode] = [:]
+    @Published var alienNodes: [ObjectIdentifier: SCNNode] = [:]
+    @Published var flockNodes: [ObjectIdentifier: SCNNode] = [:]
 
     // ============================================================
     // CANNON
@@ -158,13 +155,13 @@ final class GameState: ObservableObject {
 
         case .tunnel:
             TunnelGameState.update(
-                game: self,
+                gameState: self,
                 dt: deltaTime
             )
 
         case .ocean:
             OceanGameState.update(
-                game: self,
+                gameState: self,
                 dt: deltaTime
             )
 

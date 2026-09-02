@@ -304,19 +304,15 @@ final class OceanSceneWorld {
         //
         // This renderer does not create sharks itself.
 
-        if currentSection == .ocean {
 
             gameState.sharkManager.update(
                 game: gameState,
                 dt: dt
             )
-        }
-
-
+ 
         // MARK: - Ocean / Tunnel Environment
 
-        if currentSection == .ocean {
-
+   
             // Deep ocean environment.
             scene.background.contents = UIColor(
                 red: 0.005,
@@ -345,24 +341,6 @@ final class OceanSceneWorld {
                 segment.isHidden = true
             }
 
-        } else {
-
-            // Restore the space/tunnel environment.
-
-            scene.background.contents = UIColor.black
-
-            scene.fogColor = UIColor.black
-
-            scene.fogStartDistance = 25.0
-            scene.fogEndDistance = 95.0
-
-
-            // Tunnel segments can be visible outside the ocean.
-
-            for segment in tubeSegments {
-                segment.isHidden = false
-            }
-        }
 
 
         // MARK: - Position Tunnel Segments
@@ -410,8 +388,7 @@ final class OceanSceneWorld {
                 gameState.spaceShip.lateralAngle
             )
    
-        if currentSection == .ocean {
-
+     
             // Ocean camera stays level.
 
             camera.eulerAngles.x = 0
@@ -424,30 +401,13 @@ final class OceanSceneWorld {
                 -2.8
             )
 
-        } else {
-
-            // Tunnel camera.
-
-            camera.eulerAngles.x = 0
-            camera.eulerAngles.y = .pi
-            camera.eulerAngles.z =
-                Float(
-                    -gameState.spaceShip.lateralAngle
-                )
-
-            camera.position = SCNVector3(
-                0,
-                0.3,
-                -2.8
-            )
-        }
-
+    
 
         // MARK: - Cannon Aim
 
         let yaw =
             Float(
-                gameState.cannonLateralAngle
+                gameState.cannonAzimuth
             )
 
         let pitch =
@@ -563,17 +523,11 @@ final class OceanSceneWorld {
             //
             // Tunnel asteroids use cylindrical tunnel coordinates.
 
-            if currentSection == .ocean {
-
+   
                 node.position =
                     asteroid.oceanPosition
 
-            } else {
-
-                node.position =
-                    asteroid.tunnelPosition
-            }
-
+         
 
             // Rotate asteroid.
 
@@ -720,17 +674,7 @@ final class OceanSceneWorld {
         }
 
 
-        // MARK: - Sharks
-        //
-        // SharkManager has already spawned/updated sharks above.
-        //
-        // Therefore this section ONLY renders:
-        //
-        //     game.sharks
-        //
-        // It does NOT create sharks.
-
-        if currentSection == .ocean {
+ 
 
             var seenSharks =
                 Set<ObjectIdentifier>()
@@ -800,18 +744,6 @@ final class OceanSceneWorld {
                     )
                 }
             }
-
-        } else {
-
-            // No sharks outside the ocean.
-
-            for (_, node) in gameState.sharkNodes {
-
-                node.removeFromParentNode()
-            }
-
-            gameState.sharkNodes.removeAll()
-        }
 
 
  

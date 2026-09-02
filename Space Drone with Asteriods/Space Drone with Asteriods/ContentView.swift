@@ -7,39 +7,97 @@ import QuartzCore
 // Coordinator that owns both scene worlds and switches between them based on
 // game.score: score > 20,000 shows OceanSceneWorld, otherwise TunnelSceneWorld.
 final class GameSceneCoordinator: NSObject {
+
+    // ============================================================
+    // WORLDS
+    // ============================================================
+
     let oceanWorld = OceanSceneWorld()
     let tunnelWorld = TunnelSceneWorld()
 
-    /// Which world is currently active. Starts false so a fresh game begins in the tunnel.
+
+    // ============================================================
+    // ACTIVE WORLD
+    //
+    // Starts in the tunnel.
+    // ============================================================
+
     private(set) var usingOcean = false
-    private var lastUpdateTime: TimeInterval = CACurrentMediaTime()
+
+
+    // ============================================================
+    // SCENE
+    // ============================================================
 
     var scene: SCNScene {
-        usingOcean ? oceanWorld.scene : tunnelWorld.scene
+        usingOcean
+            ? oceanWorld.scene
+            : tunnelWorld.scene
     }
+
+
+    // ============================================================
+    // CAMERA
+    // ============================================================
 
     var camera: SCNNode {
-        usingOcean ? oceanWorld.camera : tunnelWorld.camera
+        usingOcean
+            ? oceanWorld.camera
+            : tunnelWorld.camera
     }
 
-    /// Advances whichever world is active and returns true if the active
-    /// world changed this call, so the SCNView can be told to re-point
-    /// itself at the new scene/camera.
+
+    // ============================================================
+    // SYNC
+    //
+    // GameState.currentSection is the source of truth.
+    //
+    // The score changes currentSection inside GameState.tick().
+    //
+    // Tunnel:
+    //     .tunnel
+    //
+    // Alien Ocean:
+    //     .ocean
+    //
+    // When currentSection changes, this method returns true so
+    // the SCNView can switch to the new scene and camera.
+    // ============================================================
+
     @discardableResult
     func sync(with game: GameState) -> Bool {
-        let now = CACurrentMediaTime()
-        let dt = now - lastUpdateTime
-        lastUpdateTime = now
 
-        let shouldUseOcean = (game.score >= 20_000 &&  game.score <= 30_000)
-        let switched = shouldUseOcean != usingOcean
-        usingOcean = shouldUseOcean
+        let shouldUseOcean =
+            game.currentSection == .ocean
+
+        let switched =
+            shouldUseOcean != usingOcean
+
+        usingOcean =
+            shouldUseOcean
+
+
+        // ========================================================
+        // RENDER ACTIVE WORLD
+        // ========================================================
 
         if usingOcean {
-            oceanWorld.sync(with: game)
+
+            oceanWorld.sync(
+                with: game
+            )
+
         } else {
-            tunnelWorld.sync(with: game)
+
+            tunnelWorld.sync(
+                with: game
+            )
         }
+
+
+        // ========================================================
+        // REPORT WHETHER THE ACTIVE SCENE CHANGED
+        // ========================================================
 
         return switched
     }

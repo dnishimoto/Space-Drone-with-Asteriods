@@ -14,7 +14,6 @@ enum OceanGameState {
     // OCEAN STATE
     // ============================================================
 
-    static var sharks: [Shark] = []
 
     // Magnetic current affecting the ship.
     static var magneticCurrent =
@@ -29,7 +28,7 @@ enum OceanGameState {
     // ============================================================
 
     static func update(
-        game: GameState,
+        gameState : GameState,
         dt: CGFloat
     ) {
 
@@ -38,7 +37,7 @@ enum OceanGameState {
         // --------------------------------------------------------
 
         updateMagneticCurrent(
-            game: game,
+            game: gameState,
             dt: dt
         )
 
@@ -46,14 +45,14 @@ enum OceanGameState {
         // SQUIDS
         // --------------------------------------------------------
 
-        game.swarmManager.update(
+        gameState.swarmManager.update(
             dt: dt,
             shipSpeed:
-                game.spaceShip.forwardSpeed,
+                gameState.spaceShip.forwardSpeed,
             playerAngle:
-                game.spaceShip.lateralAngle,
+                gameState.spaceShip.lateralAngle,
             progress:
-                game.spaceShip.progress
+                gameState.spaceShip.progress
         )
 
         // --------------------------------------------------------
@@ -63,20 +62,20 @@ enum OceanGameState {
         let difficulty =
             1.0 +
             min(
-                Double(game.score),
+                Double(gameState.score),
                 400.0
             ) /
             400.0 *
             2.0
 
-        game.flockManager.update(
+        gameState.flockManager.update(
             dt: dt,
             shipSpeed:
-                game.spaceShip.forwardSpeed,
+                gameState.spaceShip.forwardSpeed,
             playerAngle:
-                game.spaceShip.lateralAngle,
+                gameState.spaceShip.lateralAngle,
             progress:
-                game.spaceShip.progress,
+                gameState.spaceShip.progress,
             difficulty:
                 difficulty
         )
@@ -86,7 +85,7 @@ enum OceanGameState {
         // --------------------------------------------------------
 
         updateSharks(
-            game: game,
+            game: gameState,
             dt: dt
         )
 
@@ -95,7 +94,7 @@ enum OceanGameState {
         // --------------------------------------------------------
 
         checkCollisions(
-            game: game
+            game: gameState
         )
     }
 
@@ -165,7 +164,7 @@ enum OceanGameState {
         game: GameState,
         dt: CGFloat
     ) {
-        for shark in sharks {
+        for shark in game.sharks {
             shark.update(
                 dt: dt,
                 shipSpeed: game.spaceShip.forwardSpeed,
@@ -173,7 +172,7 @@ enum OceanGameState {
             )
         }
 
-        sharks.removeAll {
+        game.sharks.removeAll {
             $0.position.z < -10.0
         }
     }
@@ -389,7 +388,7 @@ enum OceanGameState {
         // SHIP → SHARK
         // --------------------------------------------------------
 
-        for shark in sharks
+        for shark in game.sharks
         where !shark.destroyed {
 
             if hitsShip(
@@ -491,7 +490,6 @@ enum OceanGameState {
 
     static func reset() {
 
-        sharks.removeAll()
 
         magneticCurrent =
             .zero
