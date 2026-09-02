@@ -1,13 +1,55 @@
 import SwiftUI
 import SceneKit
+import QuartzCore
 
 // MARK: - SceneKit container
 
-// This container will show the ocean scene when GameState.currentSection == .ocean,
-// and needs to be extended to allow switching between TunnelSceneWorld and OceanSceneWorld as the game progresses.
+// Coordinator that owns both scene worlds and switches between them based on
+// game.score: score > 20,000 shows OceanSceneWorld, otherwise TunnelSceneWorld.
+final class GameSceneCoordinator: NSObject {
+    let oceanWorld = OceanSceneWorld()
+    let tunnelWorld = TunnelSceneWorld()
+
+    /// Which world is currently active. Starts false so a fresh game begins in the tunnel.
+    private(set) var usingOcean = false
+    private var lastUpdateTime: TimeInterval = CACurrentMediaTime()
+
+    var scene: SCNScene {
+        usingOcean ? oceanWorld.scene : tunnelWorld.scene
+    }
+
+    var camera: SCNNode {
+        usingOcean ? oceanWorld.camera : tunnelWorld.camera
+    }
+
+    /// Advances whichever world is active and returns true if the active
+    /// world changed this call, so the SCNView can be told to re-point
+    /// itself at the new scene/camera.
+    @discardableResult
+    func sync(with game: GameState) -> Bool {
+        let now = CACurrentMediaTime()
+        let dt = now - lastUpdateTime
+        lastUpdateTime = now
+
+        let shouldUseOcean = (game.score >= 20_000 &&  game.score <= 30_000)
+        let switched = shouldUseOcean != usingOcean
+        usingOcean = shouldUseOcean
+
+        if usingOcean {
+            oceanWorld.sync(with: game)
+        } else {
+            tunnelWorld.sync(with: game)
+        }
+
+        return switched
+    }
+}
+
+// This container shows OceanSceneWorld once game.score exceeds 20,000,
+// and TunnelSceneWorld otherwise, via GameSceneCoordinator.
 struct SceneKitContainerView: UIViewRepresentable {
     @ObservedObject var game: GameState
-    func makeCoordinator() -> OceanSceneWorld { OceanSceneWorld() }
+    func makeCoordinator() -> GameSceneCoordinator { GameSceneCoordinator() }
     func makeUIView(context: Context) -> SCNView {
         let view = SCNView()
         view.scene = context.coordinator.scene
@@ -18,7 +60,11 @@ struct SceneKitContainerView: UIViewRepresentable {
         return view
     }
     func updateUIView(_ uiView: SCNView, context: Context) {
-        context.coordinator.sync(with: game)
+        let switched = context.coordinator.sync(with: game)
+        if switched {
+            uiView.scene = context.coordinator.scene
+            uiView.pointOfView = context.coordinator.camera
+        }
     }
 }
 
