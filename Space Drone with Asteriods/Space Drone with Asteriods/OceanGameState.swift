@@ -165,20 +165,16 @@ enum OceanGameState {
         game: GameState,
         dt: CGFloat
     ) {
-
         for shark in sharks {
-
             shark.update(
                 dt: dt,
-                shipSpeed:
-                    game.spaceShip.forwardSpeed,
-                playerAngle:
-                    game.spaceShip.lateralAngle
+                shipSpeed: game.spaceShip.forwardSpeed,
+                playerAngle: game.spaceShip.lateralAngle
             )
         }
 
         sharks.removeAll {
-            $0.z < -10.0
+            $0.position.z < -10.0
         }
     }
 

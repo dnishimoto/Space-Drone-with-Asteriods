@@ -84,5 +84,67 @@
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "E21F4ACD-8A9D-4347-A998-234ED9C92ED9"
+            shouldBeEnabled = "No"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "Space Drone with Asteriods/OceanGameState.swift"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "168"
+            endingLineNumber = "168"
+            landmarkName = "updateSharks(game:dt:)"
+            landmarkType = "7">
+            <Locations>
+               <Location
+                  uuid = "E21F4ACD-8A9D-4347-A998-234ED9C92ED9 - 95a4d7a4899b560d"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "static Space_Drone_with_Asteriods.OceanGameState.updateSharks(game: Space_Drone_with_Asteriods.GameState, dt: CoreGraphics.CGFloat) -&gt; ()"
+                  moduleName = "Space Drone with Asteriods.debug.dylib"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/davidnishimoto/Desktop/Space-Drone-with-Asteriods/Space%20Drone%20with%20Asteriods/Space%20Drone%20with%20Asteriods/OceanGameState.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "168"
+                  endingLineNumber = "168">
+               </Location>
+               <Location
+                  uuid = "E21F4ACD-8A9D-4347-A998-234ED9C92ED9 - 95a4d7a4899b560d"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "static Space_Drone_with_Asteriods.OceanGameState.updateSharks(game: Space_Drone_with_Asteriods.GameState, dt: CoreGraphics.CGFloat) -&gt; ()"
+                  moduleName = "Space Drone with Asteriods.debug.dylib"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/davidnishimoto/Desktop/Space-Drone-with-Asteriods/Space%20Drone%20with%20Asteriods/Space%20Drone%20with%20Asteriods/OceanGameState.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "168"
+                  endingLineNumber = "168">
+               </Location>
+            </Locations>
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "AAA3E12F-841F-4E37-83FD-7177A3CB8050"
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "Space Drone with Asteriods/OceanGameState.swift"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "40"
+            endingLineNumber = "40"
+            landmarkName = "update(game:dt:)"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
    </Breakpoints>
 </Bucket>
