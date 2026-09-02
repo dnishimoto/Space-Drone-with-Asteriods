@@ -955,7 +955,8 @@ final class TunnelSceneWorld {
        
         
 
-        for squid in gameState.swarmManager.squids {
+        for squid in gameState.swarmManager.squids
+        where !squid.destroyed {
 
             let id =
                 ObjectIdentifier(squid)

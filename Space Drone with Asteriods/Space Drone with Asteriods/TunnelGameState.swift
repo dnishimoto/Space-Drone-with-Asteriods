@@ -1,5 +1,3 @@
-
-
 import Foundation
 import SceneKit
 
@@ -503,6 +501,72 @@ enum TunnelGameState {
         }
         
         // --------------------------------------------------------
+        // PLAYER LASERS → SQUID
+        // --------------------------------------------------------
+
+        for laser in game.playerLasers {
+
+            let laserPosition =
+                laser.worldPosition()
+
+            for squid in
+                game.swarmManager.squids
+                where !squid.destroyed {
+
+                let radius =
+                    Tunnel.radius *
+                    squid.radialOffset
+
+                let position =
+                    SCNVector3(
+
+                        Float(
+                            radius *
+                            CGFloat(
+                                cos(
+                                    squid.lateralAngle
+                                )
+                            )
+                        ),
+
+                        Float(
+                            radius *
+                            CGFloat(
+                                sin(
+                                    squid.lateralAngle
+                                )
+                            )
+                        ),
+
+                        Float(squid.z)
+                    )
+
+                if distance(
+                    laserPosition,
+                    position
+                ) <= 1.3 {
+
+                    game.addPendingExplosion(x:squid.x,y:squid.y,z:squid.z)
+
+                    squid.destroyed = true
+
+                    game.score += 60
+
+                    game.spawnExplosion(
+                        x:
+                            CGFloat(position.x),
+                        y:
+                            CGFloat(position.y),
+                        z:
+                            CGFloat(position.z),
+                        scale:
+                            0.85
+                    )
+                }
+            }
+        }
+
+        // --------------------------------------------------------
         // PLAYER LASERS → FISH
         // --------------------------------------------------------
 
@@ -783,4 +847,3 @@ enum TunnelGameState {
         asteroidSpawnClock = 0
     }
 }
-
