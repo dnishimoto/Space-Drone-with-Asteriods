@@ -955,10 +955,10 @@ final class TunnelSceneWorld {
        
         
 
-        for alien in gameState.swarmManager.aliens {
+        for squid in gameState.swarmManager.squids {
 
             let id =
-                ObjectIdentifier(alien)
+                ObjectIdentifier(squid)
 
             seenAliens.insert(id)
 
@@ -983,11 +983,11 @@ final class TunnelSceneWorld {
 
 
             node.position =
-                alien.position
+                squid.position
 
             CreatureMesh.animateSquid(
                 node,
-                phase: alien.animPhase
+                phase: squid.animPhase
             )
         }
 

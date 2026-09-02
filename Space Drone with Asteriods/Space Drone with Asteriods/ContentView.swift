@@ -175,7 +175,7 @@ struct RadarMapView: View {
                     let p = map(angle: a.lateralAngle, z: a.z)
                     context.fill(Path(ellipseIn: CGRect(x: p.x - 2, y: p.y - 2, width: 4, height: 4)), with: .color(.gray))
                 }
-                for a in game.swarmManager.aliens where !a.destroyed {
+                for a in game.swarmManager.squids where !a.destroyed {
                     let p = map(angle: a.lateralAngle, z: a.z)
                     context.fill(Path(ellipseIn: CGRect(x: p.x - 1.5, y: p.y - 1.5, width: 3, height: 3)), with: .color(.purple))
                 }

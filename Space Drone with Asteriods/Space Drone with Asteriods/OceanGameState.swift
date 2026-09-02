@@ -195,13 +195,12 @@ enum OceanGameState {
                 laser.worldPosition()
 
             for alien in
-                game.swarmManager.aliens
+                game.swarmManager.squids
                 where !alien.destroyed {
 
-                let radius =
-                    Tunnel.radius *
-                    alien.radialOffset
 
+                var radius : CGFloat = 100.0
+                
                 let position =
                     SCNVector3(
 
@@ -321,7 +320,7 @@ enum OceanGameState {
             game.spaceShip.lateralAngle
 
         for alien in
-            game.swarmManager.aliens
+            game.swarmManager.squids
             where !alien.destroyed {
 
             if hitsShip(
@@ -436,53 +435,6 @@ enum OceanGameState {
             angleDifference < 0.30
     }
 
-    // ============================================================
-    // ANGULAR DISTANCE
-    // ============================================================
-
-    private static func angularDistance(
-        _ a: Double,
-        _ b: Double
-    ) -> Double {
-
-        var d =
-            abs(a - b)
-
-        while d > .pi {
-            d =
-                abs(
-                    d -
-                    2.0 * .pi
-                )
-        }
-
-        return d
-    }
-
-    // ============================================================
-    // VECTOR DISTANCE
-    // ============================================================
-
-    private static func distance(
-        _ a: SCNVector3,
-        _ b: SCNVector3
-    ) -> CGFloat {
-
-        let dx =
-            CGFloat(a.x - b.x)
-
-        let dy =
-            CGFloat(a.y - b.y)
-
-        let dz =
-            CGFloat(a.z - b.z)
-
-        return (
-            dx * dx +
-            dy * dy +
-            dz * dz
-        ).squareRoot()
-    }
 
     // ============================================================
     // RESET

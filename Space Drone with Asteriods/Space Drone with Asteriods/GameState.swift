@@ -107,7 +107,20 @@ final class GameState: ObservableObject {
             }
         }
     }
-
+    func addPendingExplosion(
+        x: CGFloat,y: CGFloat,z: CGFloat,
+        
+    ) {
+   
+        pendingExplosions.append(
+            ExplosionEvent(
+                x: CGFloat(x),
+                y: CGFloat(y),
+                z: CGFloat(z),
+                scale: 0.5
+            )
+        )
+    }
     // ============================================================
     // MAIN GAME LOOP
     // ============================================================

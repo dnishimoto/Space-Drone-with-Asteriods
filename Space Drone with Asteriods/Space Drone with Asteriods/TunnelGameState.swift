@@ -458,6 +458,7 @@ enum TunnelGameState {
                     )
 
                 if distance <= collisionRadius {
+                    
 
                     game.score +=
                         asteroid.size.score
@@ -498,6 +499,178 @@ enum TunnelGameState {
 
                     break
                 }
+            }
+        }
+        
+        // --------------------------------------------------------
+        // PLAYER LASERS → FISH
+        // --------------------------------------------------------
+
+        for laser in game.playerLasers {
+
+            let laserPosition =
+                laser.worldPosition()
+
+            for alien in
+                game.flockManager.aliens
+                where !alien.destroyed {
+
+                let radius =
+                    Tunnel.radius *
+                    alien.radialOffset
+
+                let position =
+                    SCNVector3(
+
+                        Float(
+                            radius *
+                            CGFloat(
+                                cos(
+                                    alien.lateralAngle
+                                )
+                            )
+                        ),
+
+                        Float(
+                            radius *
+                            CGFloat(
+                                sin(
+                                    alien.lateralAngle
+                                )
+                            )
+                        ),
+
+                        Float(alien.z)
+                    )
+
+                if distance(
+                    laserPosition,
+                    position
+                ) <= 1.3 {
+
+                    game.addPendingExplosion(x:alien.x,y:alien.y,z:alien.z)
+                    
+                    alien.destroyed = true
+
+                    game.score += 60
+
+                    game.spawnExplosion(
+                        x:
+                            CGFloat(position.x),
+                        y:
+                            CGFloat(position.y),
+                        z:
+                            CGFloat(position.z),
+                        scale:
+                            0.85
+                    )
+                }
+            }
+        }
+
+        // --------------------------------------------------------
+        // SHIP → SQUID
+        // --------------------------------------------------------
+
+        let shipAngle =
+            game.spaceShip.lateralAngle
+
+        for squid in
+            game.swarmManager.squids
+            where !squid.destroyed {
+
+            if hitsShip(
+                angle:
+                    squid.lateralAngle,
+                z:
+                    squid.z,
+                shipAngle:
+                    shipAngle
+            ) {
+
+                if game.shieldActive {
+                    
+
+                    squid.destroyed = true
+                    
+                    game.addPendingExplosion(x:squid.x,y:squid.y,z:squid.z)
+
+                    continue
+                }
+
+                game.score =
+                    max(
+                        0,
+                        game.score - 25
+                    )
+
+                squid.destroyed = true
+            }
+        }
+
+        // --------------------------------------------------------
+        // SHIP → FISH
+        // --------------------------------------------------------
+
+        for alien in
+            game.flockManager.aliens
+            where !alien.destroyed {
+
+            if hitsShip(
+                angle:
+                    alien.lateralAngle,
+                z:
+                    alien.z,
+                shipAngle:
+                    shipAngle
+            ) {
+
+                if game.shieldActive {
+
+                    alien.destroyed = true
+                    
+                    
+
+                    continue
+                }
+
+                game.score =
+                    max(
+                        0,
+                        game.score - 20
+                    )
+
+                alien.destroyed = true
+            }
+        }
+
+        // --------------------------------------------------------
+        // SHIP → SHARK
+        // --------------------------------------------------------
+
+        for shark in game.sharks
+        where !shark.destroyed {
+
+            if hitsShip(
+                angle:
+                    shark.lateralAngle,
+                z:
+                    shark.z,
+                shipAngle:
+                    shipAngle
+            ) {
+
+                if game.shieldActive {
+
+                    shark.destroyed = true
+
+                    continue
+                }
+
+                // Shark is a major Ocean opponent.
+                game.gameOver = true
+
+                game.stopFiring()
             }
         }
 
@@ -544,6 +717,22 @@ enum TunnelGameState {
                 }
             }
         }
+    }
+    private static func hitsShip(
+        angle: Double,
+        z: CGFloat,
+        shipAngle: Double
+    ) -> Bool {
+
+        let angleDifference =
+            angularDistance(
+                angle,
+                shipAngle
+            )
+
+        return
+            abs(z) < 1.6 &&
+            angleDifference < 0.30
     }
 
     // ============================================================

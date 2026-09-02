@@ -562,10 +562,10 @@ final class OceanSceneWorld {
         var seenAliens =
             Set<ObjectIdentifier>()
 
-        for alien in gameState.swarmManager.aliens {
+        for squid in gameState.swarmManager.squids {
 
             let id =
-                ObjectIdentifier(alien)
+                ObjectIdentifier(squid)
 
             seenAliens.insert(id)
 
@@ -590,11 +590,11 @@ final class OceanSceneWorld {
 
 
             node.position =
-                alien.position
+                squid.position
 
             CreatureMesh.animateSquid(
                 node,
-                phase: alien.animPhase
+                phase: squid.animPhase
             )
         }
 
