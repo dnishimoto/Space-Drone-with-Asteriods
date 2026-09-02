@@ -10,6 +10,12 @@ import SwiftUI
 import SceneKit
 import Combine
 
+/// Enum representing the current section of the game scene,
+/// supporting multiple game stages for progression and variety.
+enum SceneSection {
+    case asteroid, ocean, storm, core, finale
+}
+
 final class GameState: ObservableObject {
     var cannonMuzzleWorldPosition = SCNVector3(0, 0, 0)
     @Published var cannonLateralAngle: Double = 0.0
@@ -24,11 +30,13 @@ final class GameState: ObservableObject {
     let swarmManager = SwarmManager()
     let flockManager = FlockManager()
 
-    @Published var score = 0
+    @Published var score = 20000  //dsn
     @Published var gameOver = false
     @Published var volume: Double = 1.0
     @Published private(set) var frameTick: Int = 0
     @Published private(set) var shieldActive = false
+
+    @Published var currentSection: SceneSection = .asteroid
 
     var cannonAzimuth: Double = 0
     var joystickVector: CGVector = .zero
@@ -535,6 +543,48 @@ final class GameState: ObservableObject {
 
             score += 1
         }
+        
+        // ------------------------------------------------------------
+        // GAME STAGE PROGRESSION
+        // ------------------------------------------------------------
+        // Automatically progress game stages at score milestones.
+        // Transitions happen only once.
+        
+        switch currentSection {
+        case .asteroid:
+            if score >= 20_000 {
+                currentSection = .ocean
+            }
+        case .ocean:
+            if score >= 40_000 {
+                currentSection = .storm
+            }
+        case .storm:
+            if score >= 60_000 {
+                currentSection = .core
+            }
+        case .core:
+            if score >= 80_000 {
+                currentSection = .finale
+            }
+        case .finale:
+            // Final stage reached; no further progression.
+            break
+        }
+
+        // Add special logic for each stage here (entity spawning, visuals, etc.)
+        // switch currentSection {
+        // case .asteroid:
+        //     // Asteroid stage logic
+        // case .ocean:
+        //     // Ocean stage logic
+        // case .storm:
+        //     // Storm stage logic
+        // case .core:
+        //     // Core stage logic
+        // case .finale:
+        //     // Finale stage logic
+        // }
 
         // ------------------------------------------------------------
         // FRAME COUNTER
@@ -1238,6 +1288,7 @@ final class GameState: ObservableObject {
         asteroidSpawnClock = 0
         cannonAzimuth = 0
         cannonElevation = 0
+        currentSection = .asteroid
         scheduleEnemy()
     }
 

@@ -3,9 +3,11 @@ import SceneKit
 
 // MARK: - SceneKit container
 
+// This container will show the ocean scene when GameState.currentSection == .ocean,
+// and needs to be extended to allow switching between TunnelSceneWorld and OceanSceneWorld as the game progresses.
 struct SceneKitContainerView: UIViewRepresentable {
     @ObservedObject var game: GameState
-    func makeCoordinator() -> SceneWorld { SceneWorld() }
+    func makeCoordinator() -> OceanSceneWorld { OceanSceneWorld() }
     func makeUIView(context: Context) -> SCNView {
         let view = SCNView()
         view.scene = context.coordinator.scene
@@ -164,6 +166,19 @@ struct ContentView: View {
                     .onAppear { game.start() }
                     .onDisappear { game.stopAll() }
                 CockpitWindowOverlay()
+                
+                // Scene label overlay at top center with updated names
+                VStack {
+                    Text(sceneLabel(for: game.currentSection))
+                        .font(.system(size: 18, weight: .semibold, design: .rounded))
+                        .foregroundColor(.white.opacity(0.9))
+                        .padding(.top, 16)
+                        .padding(.bottom, 4)
+                        .frame(maxWidth: .infinity)
+                        .background(Color.black.opacity(0.4))
+                    Spacer()
+                }
+                .ignoresSafeArea(edges: .top)
 
                 if game.gameOver {
                     VStack(spacing: 16) {
@@ -178,7 +193,7 @@ struct ContentView: View {
                 VStack {
                     HStack(alignment: .top) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Tube Runner").foregroundColor(.white).font(.system(size: 16, weight: .semibold))
+                            
                             Text("Blue: move · Red: aim + hold to fire")
                                 .foregroundColor(.white.opacity(0.9)).font(.system(size: 12))
                             Text("Purple squid · Teal deep fish · Shield 2s")
@@ -216,9 +231,13 @@ struct ContentView: View {
                                     dx: v.dx,
                                     dy: v.dy
                                 )
+                                // Clamp ship to surface if in ocean section after joystick input changes
+                                clampShipToSurfaceIfNeeded()
                             },
                             onEnd: {
                                 game.joystickVector = .zero
+                                // Clamp ship to surface if in ocean section after joystick ends
+                                clampShipToSurfaceIfNeeded()
                             }
                         )
                         
@@ -264,5 +283,27 @@ struct ContentView: View {
         .sheet(isPresented: $showVolumeDialog) { VolumeView(volume: $game.volume) }
         .preferredColorScheme(.dark)
         .statusBarHidden()
+    }
+    
+    private func sceneLabel(for section: SceneSection) -> String {
+        switch section {
+        case .asteroid: return "SPACE TUNNEL"
+        case .ocean: return "ALIEN OCEAN"
+        case .storm: return "MAGNETIC STORM"
+        case .core: return "PLANETARY CORE"
+        case .finale: return "THE FINALE"
+        }
+    }
+    
+    /// Clamp the ship position so it does not go below the surface (y < 0) when in ocean section.
+    /// This prevents the ship from going under the ocean surface.
+    private func clampShipToSurfaceIfNeeded() {
+        guard game.currentSection == .ocean else { return }
+        // Clamp y position to 0 or above
+        if game.spaceShip.position.y < 0 {
+            var pos = game.spaceShip.position
+            pos.y = 0
+            game.spaceShip.position = pos
+        }
     }
 }

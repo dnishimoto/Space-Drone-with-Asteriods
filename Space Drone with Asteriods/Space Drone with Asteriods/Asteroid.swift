@@ -9,6 +9,10 @@ import Foundation
 import SceneKit
 
 
+/// Represents an asteroid entity in the game.
+/// 
+/// Note: Asteroid behaviors may vary depending on the current scene stage or section.
+/// The update method is structured to allow conditional behavior based on the game section in the future.
 final class Asteroid {
     var lateralAngle: Double
     var z: CGFloat

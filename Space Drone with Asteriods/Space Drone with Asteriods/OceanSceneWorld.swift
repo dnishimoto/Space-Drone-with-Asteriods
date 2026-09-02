@@ -5,11 +5,13 @@
 //  Created by David Nishimoto on 8/30/26.
 //
 
+// This class manages the ALIEN OCEAN scene and ocean-stage visuals, creatures, and effects.
+
 import Foundation
 import SwiftUI
 import SceneKit
 
-final class SceneWorld {
+final class OceanSceneWorld {
     let scene = SCNScene()
     let camera = SCNNode()
     
@@ -294,6 +296,55 @@ final class SceneWorld {
     }
     func sync(with game: GameState) {
 
+        // Read currentSection first
+        let currentSection = game.currentSection
+
+        // ============================================================
+        // Scene Background and Fog based on currentSection
+        // ============================================================
+
+        if currentSection == .ocean {
+            // Deep ocean blue background and fog
+            scene.background.contents = UIColor(red: 0.0, green: 0.05, blue: 0.15, alpha: 1)
+            scene.fogColor = UIColor(red: 0.0, green: 0.1, blue: 0.25, alpha: 1)
+            scene.fogStartDistance = 15
+            scene.fogEndDistance = 70
+
+            // Optionally tint or dim the tube segments to bluish
+            for segment in tubeSegments {
+                if let tube = segment.geometry as? SCNTube {
+                    tube.firstMaterial?.diffuse.contents = UIColor(red: 0.02, green: 0.07, blue: 0.12, alpha: 1)
+                    tube.firstMaterial?.emission.contents = UIColor(red: 0.01, green: 0.03, blue: 0.06, alpha: 1)
+                }
+                // Also dim rings if present
+                for child in segment.childNodes {
+                    if let ring = child.geometry as? SCNTorus {
+                        ring.firstMaterial?.diffuse.contents = UIColor.cyan.withAlphaComponent(0.2)
+                        ring.firstMaterial?.emission.contents = UIColor.cyan.withAlphaComponent(0.1)
+                    }
+                }
+            }
+        } else {
+            // Default space background and fog
+            scene.background.contents = UIColor.black
+            scene.fogColor = UIColor(red: 0.02, green: 0.02, blue: 0.06, alpha: 1)
+            scene.fogStartDistance = 25
+            scene.fogEndDistance = 95
+            // Restore tube segment colors
+            for segment in tubeSegments {
+                if let tube = segment.geometry as? SCNTube {
+                    tube.firstMaterial?.diffuse.contents = UIColor(red: 0.08, green: 0.1, blue: 0.16, alpha: 1)
+                    tube.firstMaterial?.emission.contents = UIColor(red: 0.02, green: 0.04, blue: 0.08, alpha: 1)
+                }
+                for child in segment.childNodes {
+                    if let ring = child.geometry as? SCNTorus {
+                        ring.firstMaterial?.diffuse.contents = UIColor.cyan.withAlphaComponent(0.35)
+                        ring.firstMaterial?.emission.contents = UIColor.cyan.withAlphaComponent(0.2)
+                    }
+                }
+            }
+        }
+
         // ============================================================
         // TUNNEL
         // ============================================================
@@ -466,181 +517,224 @@ final class SceneWorld {
         // ============================================================
         // ASTEROIDS
         // ============================================================
-
-        var seenA = Set<ObjectIdentifier>()
-
-        for asteroid in game.asteroids {
-
-            let id = ObjectIdentifier(asteroid)
-
-            seenA.insert(id)
-
-            let node: SCNNode
-
-            if let existing = asteroidNodes[id] {
-
-                node = existing
-
-            } else {
-
-                let geo = SCNSphere(
-                    radius: asteroid.size.radius
-                )
-
-                geo.firstMaterial?.diffuse.contents =
-                    UIColor.darkGray
-
-                geo.firstMaterial?.emission.contents =
-                    UIColor(white: 0.1, alpha: 1)
-
-                node = SCNNode(
-                    geometry: geo
-                )
-
-                asteroidContainer.addChildNode(node)
-
-                asteroidNodes[id] = node
-            }
-
-            node.position =
-                asteroid.position
-
-            node.eulerAngles.y =
-                asteroid.spin
+        // Show asteroids only in asteroid section,
+        // or optionally some sparse debris in ocean section.
+        var showAsteroids = false
+        if currentSection == .asteroid {
+            showAsteroids = true
+        } else if currentSection == .ocean {
+            // Optionally show a few asteroids as debris in ocean.
+            // Here we disable asteroids entirely for ocean.
+            showAsteroids = false
         }
 
-        for (id, node) in asteroidNodes
-            where !seenA.contains(id) {
+        if showAsteroids {
+            var seenA = Set<ObjectIdentifier>()
 
-            node.removeFromParentNode()
+            for asteroid in game.asteroids {
 
-            asteroidNodes.removeValue(
-                forKey: id
-            )
+                let id = ObjectIdentifier(asteroid)
+
+                seenA.insert(id)
+
+                let node: SCNNode
+
+                if let existing = asteroidNodes[id] {
+
+                    node = existing
+
+                } else {
+
+                    let geo = SCNSphere(
+                        radius: asteroid.size.radius
+                    )
+
+                    geo.firstMaterial?.diffuse.contents =
+                        UIColor.darkGray
+
+                    geo.firstMaterial?.emission.contents =
+                        UIColor(white: 0.1, alpha: 1)
+
+                    node = SCNNode(
+                        geometry: geo
+                    )
+
+                    asteroidContainer.addChildNode(node)
+
+                    asteroidNodes[id] = node
+                }
+
+                node.position =
+                    asteroid.position
+
+                node.eulerAngles.y =
+                    asteroid.spin
+            }
+
+            for (id, node) in asteroidNodes
+                where !seenA.contains(id) {
+
+                node.removeFromParentNode()
+
+                asteroidNodes.removeValue(
+                    forKey: id
+                )
+            }
+        } else {
+            // Remove all asteroid nodes if we are not showing asteroids
+            for (_, node) in asteroidNodes {
+                node.removeFromParentNode()
+            }
+            asteroidNodes.removeAll()
         }
 
         // ============================================================
         // SQUID SWARM
         // ============================================================
+        // Show squid swarm in ocean section
+        if currentSection == .ocean {
+            var seenS = Set<ObjectIdentifier>()
 
-        var seenS = Set<ObjectIdentifier>()
+            for alien in game.swarmManager.aliens
+                where !alien.destroyed {
 
-        for alien in game.swarmManager.aliens
-            where !alien.destroyed {
+                let id = ObjectIdentifier(alien)
 
-            let id = ObjectIdentifier(alien)
+                seenS.insert(id)
 
-            seenS.insert(id)
+                let node: SCNNode
 
-            let node: SCNNode
+                if let existing = alienNodes[id] {
 
-            if let existing = alienNodes[id] {
+                    node = existing
 
-                node = existing
+                } else {
 
-            } else {
+                    node = CreatureMesh.makeSquid()
 
-                node = CreatureMesh.makeSquid()
+                    alienContainer.addChildNode(node)
 
-                alienContainer.addChildNode(node)
+                    alienNodes[id] = node
+                }
 
-                alienNodes[id] = node
+                node.position =
+                    alien.position
+
+                node.eulerAngles.y =
+                    Float(alien.lateralAngle)
+
+                CreatureMesh.animateSquid(
+                    node,
+                    phase: alien.animPhase
+                )
             }
 
-            node.position =
-                alien.position
+            for (id, node) in alienNodes
+                where !seenS.contains(id) {
 
-            node.eulerAngles.y =
-                Float(alien.lateralAngle)
+                node.removeFromParentNode()
 
-            CreatureMesh.animateSquid(
-                node,
-                phase: alien.animPhase
-            )
-        }
-
-        for (id, node) in alienNodes
-            where !seenS.contains(id) {
-
-            node.removeFromParentNode()
-
-            alienNodes.removeValue(
-                forKey: id
-            )
+                alienNodes.removeValue(
+                    forKey: id
+                )
+            }
+        } else {
+            // Remove squid aliens if not ocean section
+            for (_, node) in alienNodes {
+                node.removeFromParentNode()
+            }
+            alienNodes.removeAll()
         }
 
         // ============================================================
         // DEEP FISH FLOCK
         // ============================================================
+        // Show deep fish flock in ocean section
+        if currentSection == .ocean {
+            var seenF = Set<ObjectIdentifier>()
 
-        var seenF = Set<ObjectIdentifier>()
+            for alien in game.flockManager.aliens
+                where !alien.destroyed {
 
-        for alien in game.flockManager.aliens
-            where !alien.destroyed {
+                let id = ObjectIdentifier(alien)
 
-            let id = ObjectIdentifier(alien)
+                seenF.insert(id)
 
-            seenF.insert(id)
+                let node: SCNNode
 
-            let node: SCNNode
+                if let existing = flockNodes[id] {
 
-            if let existing = flockNodes[id] {
+                    node = existing
 
-                node = existing
+                } else {
 
-            } else {
+                    node = CreatureMesh.makeDeepFish()
 
-                node = CreatureMesh.makeDeepFish()
+                    flockContainer.addChildNode(node)
 
-                flockContainer.addChildNode(node)
+                    flockNodes[id] = node
+                }
 
-                flockNodes[id] = node
+                node.position =
+                    alien.position
+
+                node.eulerAngles.y =
+                    Float(alien.lateralAngle)
+
+                CreatureMesh.animateFish(
+                    node,
+                    phase: alien.animPhase
+                )
             }
 
-            node.position =
-                alien.position
+            for (id, node) in flockNodes
+                where !seenF.contains(id) {
 
-            node.eulerAngles.y =
-                Float(alien.lateralAngle)
+                node.removeFromParentNode()
 
-            CreatureMesh.animateFish(
-                node,
-                phase: alien.animPhase
-            )
-        }
-
-        for (id, node) in flockNodes
-            where !seenF.contains(id) {
-
-            node.removeFromParentNode()
-
-            flockNodes.removeValue(
-                forKey: id
-            )
+                flockNodes.removeValue(
+                    forKey: id
+                )
+            }
+        } else {
+            // Remove fish flock nodes if not ocean section
+            for (_, node) in flockNodes {
+                node.removeFromParentNode()
+            }
+            flockNodes.removeAll()
         }
         
         // ============================================================
         // SHARKS (NEW)
         // ============================================================
-        var seenSharks = Set<ObjectIdentifier>()
-        for shark in game.sharks where !shark.destroyed {
-            let id = ObjectIdentifier(shark)
-            seenSharks.insert(id)
-            let node: SCNNode
-            if let existing = sharkNodes[id] {
-                node = existing
-            } else {
-                node = CreatureMesh.makeShark()
-                sharkContainer.addChildNode(node)
-                sharkNodes[id] = node
+        // Show sharks only in ocean section
+        if currentSection == .ocean {
+            var seenSharks = Set<ObjectIdentifier>()
+            for shark in game.sharks where !shark.destroyed {
+                let id = ObjectIdentifier(shark)
+                seenSharks.insert(id)
+                let node: SCNNode
+                if let existing = sharkNodes[id] {
+                    node = existing
+                } else {
+                    node = CreatureMesh.makeShark()
+                    sharkContainer.addChildNode(node)
+                    sharkNodes[id] = node
+                }
+                node.position = shark.position
+                node.eulerAngles.y = Float(shark.lateralAngle)
+                CreatureMesh.animateShark(node, phase: shark.animPhase)
             }
-            node.position = shark.position
-            node.eulerAngles.y = Float(shark.lateralAngle)
-            CreatureMesh.animateShark(node, phase: shark.animPhase)
-        }
-        for (id, node) in sharkNodes where !seenSharks.contains(id) {
-            node.removeFromParentNode()
-            sharkNodes.removeValue(forKey: id)
+            for (id, node) in sharkNodes where !seenSharks.contains(id) {
+                node.removeFromParentNode()
+                sharkNodes.removeValue(forKey: id)
+            }
+        } else {
+            // Remove sharks if not ocean section
+            for (_, node) in sharkNodes {
+                node.removeFromParentNode()
+            }
+            sharkNodes.removeAll()
         }
 
         // ============================================================
@@ -670,7 +764,17 @@ final class SceneWorld {
                 )
             )
         }
+        
+        // ============================================================
+        // OCEAN-SPECIFIC EFFECTS AND ENTITIES
+        // ============================================================
+        // Future expansion point for ocean scene behaviors, lighting,
+        // particle effects, underwater fog variations, and additional
+        // oceanic creatures or visuals.
+
+        // ============================================================
         // Explosions
+        // ============================================================
           processExplosions(game)
     }
     private func processExplosions(_ game: GameState) {
@@ -883,3 +987,4 @@ extension CreatureMesh {
         return root
     }
 }
+
