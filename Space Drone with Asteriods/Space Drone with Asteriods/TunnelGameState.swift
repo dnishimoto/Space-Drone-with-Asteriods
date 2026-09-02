@@ -1,9 +1,4 @@
-//
-//  TunnelGameState.swift
-//  Space Drone with Asteriods
-//
-//  Created by David Nishimoto on 9/2/26.
-//
+
 
 import Foundation
 import SceneKit
@@ -12,20 +7,14 @@ import SceneKit
 enum TunnelGameState {
 
     // ============================================================
-    // TUNNEL STATE
+    // TUNNEL TIMERS
     // ============================================================
-
-    private static var asteroids: [Asteroid] = []
-
-    private static var enemySpaceShip:
-        EnemySpaceShip? = nil
 
     private static var enemySpawnTimer: Timer?
 
     private static var asteroidSpawnClock: CGFloat = 0
 
-    private static let asteroidSpawnInterval:
-        CGFloat = 1.1
+    private static let asteroidSpawnInterval: CGFloat = 1.1
 
     // ============================================================
     // UPDATE
@@ -36,51 +25,63 @@ enum TunnelGameState {
         dt: CGFloat
     ) {
 
-        // --------------------------------------------------------
+        // ============================================================
+        // TUNNEL ONLY
+        // ============================================================
+
+        guard game.currentSection == .tunnel else {
+            return
+        }
+
+        // ============================================================
         // ASTEROID SPAWNING
-        // --------------------------------------------------------
+        // ============================================================
 
         asteroidSpawnClock += dt
 
         if asteroidSpawnClock >= asteroidSpawnInterval {
 
-            asteroidSpawnClock -=
-                asteroidSpawnInterval
+            asteroidSpawnClock -= asteroidSpawnInterval
 
             spawnAsteroid(game: game)
         }
 
-        // --------------------------------------------------------
-        // ASTEROIDS
-        // --------------------------------------------------------
+        // ============================================================
+        // UPDATE TUNNEL ASTEROIDS
+        // ============================================================
 
-        for asteroid in asteroids {
+        for asteroid in game.asteroids {
 
-            asteroid.update(
+            asteroid.updateTunnel(
                 dt: dt,
-                shipSpeed:
-                    game.spaceShip.forwardSpeed
+                shipSpeed: game.spaceShip.forwardSpeed
             )
         }
 
-        asteroids.removeAll {
-            $0.z < -5.0
+        // ============================================================
+        // REMOVE ASTEROIDS THAT PASSED THE PLAYER
+        // ============================================================
+
+        game.asteroids.removeAll { asteroid in
+            asteroid.z < -5.0
         }
 
-        // --------------------------------------------------------
+        // ============================================================
         // ENEMY SPACECRAFT
-        // --------------------------------------------------------
+        // ============================================================
 
-        if let enemy = enemySpaceShip,
+        if let enemy = game.enemySpaceShip,
            !enemy.destroyed {
 
             enemy.update(
                 dt: dt,
-                shipSpeed:
-                    game.spaceShip.forwardSpeed,
-                playerAngle:
-                    game.spaceShip.lateralAngle
+                shipSpeed: game.spaceShip.forwardSpeed,
+                playerAngle: game.spaceShip.lateralAngle
             )
+
+            // --------------------------------------------------------
+            // ENEMY FIRING
+            // --------------------------------------------------------
 
             if enemy.shootCooldown <= 0 {
 
@@ -90,9 +91,7 @@ enum TunnelGameState {
                     )
 
                 let origin =
-                    enemyWorldPosition(
-                        enemy
-                    )
+                    enemyWorldPosition(enemy)
 
                 let direction =
                     enemyWorldDirectionTowardPlayer(
@@ -129,9 +128,13 @@ enum TunnelGameState {
                 )
             }
 
+            // --------------------------------------------------------
+            // ENEMY PASSED PLAYER
+            // --------------------------------------------------------
+
             if enemy.z < -6.0 {
 
-                enemySpaceShip = nil
+                game.enemySpaceShip = nil
 
                 scheduleEnemy(
                     game: game
@@ -139,62 +142,67 @@ enum TunnelGameState {
             }
         }
 
-        // --------------------------------------------------------
+        // ============================================================
         // TUNNEL COLLISIONS
-        // --------------------------------------------------------
+        // ============================================================
 
-        checkCollisions(game: game)
+        checkCollisions(
+            game: game
+        )
     }
 
     // ============================================================
-    // START ENEMY
+    // START / SCHEDULE ENEMY
     // ============================================================
 
     static func scheduleEnemy(
         game: GameState
     ) {
 
-        enemySpaceShip = nil
+        game.enemySpaceShip = nil
 
         enemySpawnTimer?.invalidate()
 
-        enemySpawnTimer = Timer.scheduledTimer(
-            withTimeInterval: 12.0,
-            repeats: false
-        ) { _ in
+        enemySpawnTimer =
+            Timer.scheduledTimer(
+                withTimeInterval: 12.0,
+                repeats: false
+            ) { _ in
 
-            Task { @MainActor in
+                Task { @MainActor in
 
-                guard !game.gameOver else {
-                    return
+                    guard !game.gameOver else {
+                        return
+                    }
+
+                    game.enemySpaceShip =
+                        EnemySpaceShip(
+                            lateralAngle:
+                                Double.random(
+                                    in: 0.0..<(2.0 * .pi)
+                                ),
+                            playerZ:
+                                game.spaceShip.z,
+                            spawnDistance:
+                                CGFloat.random(
+                                    in: 35.0...55.0
+                                )
+                        )
                 }
-
-                enemySpaceShip =
-                    EnemySpaceShip(
-                        lateralAngle:
-                            Double.random(
-                                in: 0.0..<(2.0 * .pi)
-                            ),
-
-                        playerZ:
-                            game.spaceShip.z,
-
-                        spawnDistance:
-                            CGFloat.random(
-                                in: 35.0...55.0
-                            )
-                    )
             }
-        }
     }
 
     // ============================================================
-    // ASTEROID
+    // ASTEROID SPAWN
     // ============================================================
 
     private static func spawnAsteroid(
         game: GameState
     ) {
+
+        // --------------------------------------------------------
+        // ASTEROID SIZE
+        // --------------------------------------------------------
 
         let size: AsteroidSize = {
 
@@ -214,18 +222,28 @@ enum TunnelGameState {
             return .large
         }()
 
-        let maxR = max(
-            Tunnel.minRadialOffset,
-            1.0 -
-            size.radius / Tunnel.radius -
-            0.05
-        )
+        // --------------------------------------------------------
+        // RADIAL POSITION
+        // --------------------------------------------------------
+
+        let maxR =
+            max(
+                Tunnel.minRadialOffset,
+                1.0 -
+                size.radius /
+                Tunnel.radius -
+                0.05
+            )
 
         let radialOffset =
             CGFloat.random(
                 in:
                     Tunnel.minRadialOffset...maxR
             )
+
+        // --------------------------------------------------------
+        // FORWARD SPAWN DISTANCE
+        // --------------------------------------------------------
 
         let aheadDistance =
             CGFloat(Tunnel.segmentsAhead) *
@@ -254,40 +272,44 @@ enum TunnelGameState {
             game.spaceShip.z +
             spawnDistance
 
+        // --------------------------------------------------------
+        // CREATE ASTEROID
+        // --------------------------------------------------------
+
         let asteroid =
             Asteroid(
-
                 lateralAngle:
                     Double.random(
                         in:
                             0.0..<(2.0 * .pi)
                     ),
-
                 z:
                     spawnZ,
-
                 size:
                     size,
-
                 radialOffset:
                     radialOffset,
-
                 radialVel:
                     CGFloat.random(
                         in: -0.9...0.9
                     ),
-
                 angularVel:
                     Double.random(
                         in: -0.6...0.6
                     )
             )
 
-        asteroids.append(asteroid)
+        // --------------------------------------------------------
+        // GAMESTATE OWNS THE ASTEROID
+        // --------------------------------------------------------
+
+        game.asteroids.append(
+            asteroid
+        )
     }
 
     // ============================================================
-    // ENEMY POSITION
+    // ENEMY WORLD POSITION
     // ============================================================
 
     private static func enemyWorldPosition(
@@ -302,17 +324,14 @@ enum TunnelGameState {
             enemy.lateralAngle
 
         return SCNVector3(
-
             Float(
                 radius *
                 CGFloat(cos(angle))
             ),
-
             Float(
                 radius *
                 CGFloat(sin(angle))
             ),
-
             Float(enemy.z)
         )
     }
@@ -338,28 +357,28 @@ enum TunnelGameState {
 
         let target =
             SCNVector3(
-
                 Float(
                     playerRadius *
                     CGFloat(cos(playerAngle))
                 ),
-
                 Float(
                     playerRadius *
                     CGFloat(sin(playerAngle))
                 ),
-
                 0
             )
 
         let dx =
-            target.x - origin.x
+            target.x -
+            origin.x
 
         let dy =
-            target.y - origin.y
+            target.y -
+            origin.y
 
         let dz =
-            target.z - origin.z
+            target.z -
+            origin.z
 
         let length =
             sqrt(
@@ -369,6 +388,7 @@ enum TunnelGameState {
             )
 
         guard length > 0.0001 else {
+
             return SCNVector3(
                 0,
                 0,
@@ -394,47 +414,21 @@ enum TunnelGameState {
         let laserList =
             game.playerLasers
 
+        // --------------------------------------------------------
+        // PLAYER LASERS → ASTEROIDS
+        // --------------------------------------------------------
+
         for laser in laserList {
 
             let laserPosition =
                 laser.worldPosition()
 
-            // ------------------------------
-            // ASTEROIDS
-            // ------------------------------
-
-            for asteroid in asteroids {
-
-                let radius =
-                    Tunnel.radius *
-                    asteroid.radialOffset
+            for asteroid in game.asteroids {
 
                 let asteroidPosition =
-                    SCNVector3(
+                    asteroid.tunnelPosition
 
-                        Float(
-                            radius *
-                            CGFloat(
-                                cos(
-                                    asteroid.lateralAngle
-                                )
-                            )
-                        ),
-
-                        Float(
-                            radius *
-                            CGFloat(
-                                sin(
-                                    asteroid.lateralAngle
-                                )
-                            )
-                        ),
-
-                        Float(asteroid.z)
-                    )
-
-                let collisionRadius:
-                    CGFloat
+                let collisionRadius: CGFloat
 
                 switch asteroid.size {
 
@@ -454,8 +448,7 @@ enum TunnelGameState {
                         asteroidPosition
                     )
 
-                if distance <=
-                    collisionRadius {
+                if distance <= collisionRadius {
 
                     game.score +=
                         asteroid.size.score
@@ -479,11 +472,25 @@ enum TunnelGameState {
                             : 1.0
                     )
 
-                  
+                    // Mark for removal by removing the
+                    // asteroid from GameState.
+
+                    if let index =
+                        game.asteroids.firstIndex(
+                            where: {
+                                $0 === asteroid
+                            }
+                        ) {
+
+                        game.asteroids.remove(
+                            at: index
+                        )
+                    }
+
+                    break
                 }
             }
         }
-
 
         // --------------------------------------------------------
         // ENEMY LASERS → PLAYER
@@ -498,21 +505,18 @@ enum TunnelGameState {
 
         let playerPosition =
             SCNVector3(
-
                 Float(
                     playerRadius *
                     CGFloat(
                         cos(playerAngle)
                     )
                 ),
-
                 Float(
                     playerRadius *
                     CGFloat(
                         sin(playerAngle)
                     )
                 ),
-
                 0
             )
 
@@ -526,6 +530,7 @@ enum TunnelGameState {
                 if !game.shieldActive {
 
                     game.gameOver = true
+
                     game.stopFiring()
                 }
             }
@@ -561,15 +566,23 @@ enum TunnelGameState {
     // RESET
     // ============================================================
 
-    static func reset() {
+    static func reset(
+        game: GameState
+    ) {
 
-        asteroids.removeAll()
+        // GameState owns the asteroid collection.
 
-        enemySpaceShip = nil
+        game.asteroids.removeAll()
+
+        // GameState owns the enemy.
+
+        game.enemySpaceShip = nil
 
         enemySpawnTimer?.invalidate()
+
         enemySpawnTimer = nil
 
         asteroidSpawnClock = 0
     }
 }
+

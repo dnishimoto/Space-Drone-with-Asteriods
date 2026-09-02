@@ -333,11 +333,8 @@ struct ContentView: View {
     
     private func sceneLabel(for section: SceneSection) -> String {
         switch section {
-        case .asteroid: return "SPACE TUNNEL"
+        case .tunnel: return "SPACE TUNNEL"
         case .ocean: return "ALIEN OCEAN"
-        case .storm: return "MAGNETIC STORM"
-        case .core: return "PLANETARY CORE"
-        case .finale: return "THE FINALE"
         }
     }
     

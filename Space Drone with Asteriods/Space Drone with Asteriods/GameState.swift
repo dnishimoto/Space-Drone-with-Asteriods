@@ -4,11 +4,8 @@ import SceneKit
 import Combine
 
 enum SceneSection {
-    case asteroid
+    case tunnel
     case ocean
-    case storm
-    case core
-    case finale
 }
 
 @MainActor
@@ -65,7 +62,7 @@ final class GameState: ObservableObject {
 
     @Published private(set) var shieldActive = false
 
-    @Published var currentSection: SceneSection = .asteroid
+    @Published var currentSection: SceneSection = .tunnel
 
     @Published var playCollisionSound = true
 
@@ -111,7 +108,7 @@ final class GameState: ObservableObject {
     // MAIN GAME LOOP
     // ============================================================
 
-    private func tick() {
+    func tick() {
 
         guard !gameOver else {
             stopFiring()
@@ -152,7 +149,7 @@ final class GameState: ObservableObject {
 
         switch currentSection {
 
-        case .asteroid:
+        case .tunnel:
             TunnelGameState.update(
                 game: self,
                 dt: deltaTime
@@ -164,17 +161,7 @@ final class GameState: ObservableObject {
                 dt: deltaTime
             )
 
-        case .storm:
-            // Future storm state
-            break
-
-        case .core:
-            // Future core state
-            break
-
-        case .finale:
-            // Future finale state
-            break
+ 
         }
 
         // --------------------------------------------------------
@@ -220,32 +207,22 @@ final class GameState: ObservableObject {
 
         switch currentSection {
 
-        case .asteroid:
+        case .tunnel:
 
-            if score >= 40_000 {
+            if score >= 20_000 {
                 currentSection = .ocean
             }
 
         case .ocean:
 
             if score >= 60_000 {
-                currentSection = .storm
+                
             }
 
-        case .storm:
-
-            if score >= 80_000 {
-                currentSection = .core
-            }
-
-        case .core:
-
-            if score >= 100_000 {
-                currentSection = .finale
-            }
-
-        case .finale:
-            break
+      
+        default:
+            
+            currentSection = .tunnel
         }
 
         frameTick &+= 1
@@ -423,7 +400,6 @@ final class GameState: ObservableObject {
         cannonWorldDirection =
             SCNVector3(0, 0, -1)
 
-        currentSection = .asteroid
 
         frameTick = 0
 

@@ -107,25 +107,7 @@ final class OceanSceneWorld {
             nodeMap.removeValue(forKey: id)
         }
     }
-    private func makeTubeSegment() -> SCNNode {
-        let geo = SCNTube(innerRadius: CGFloat(Tunnel.radius) - 0.08,
-                          outerRadius: CGFloat(Tunnel.radius),
-                          height: Tunnel.segmentLength)
-        geo.firstMaterial?.diffuse.contents = UIColor(red: 0.08, green: 0.1, blue: 0.16, alpha: 1)
-        geo.firstMaterial?.emission.contents = UIColor(red: 0.02, green: 0.04, blue: 0.08, alpha: 1)
-        geo.firstMaterial?.isDoubleSided = true
-        let node = SCNNode(geometry: geo)
-        node.eulerAngles.x = .pi / 2
-
-        let ring = SCNTorus(ringRadius: Tunnel.radius * 0.98, pipeRadius: 0.06)
-        ring.firstMaterial?.diffuse.contents = UIColor.cyan.withAlphaComponent(0.35)
-        ring.firstMaterial?.emission.contents = UIColor.cyan.withAlphaComponent(0.2)
-        let ringNode = SCNNode(geometry: ring)
-        ringNode.position = SCNVector3(0, -Tunnel.segmentLength * 0.5 + 0.5, 0)
-        node.addChildNode(ringNode)
-        return node
-    }
-
+  
     private func setupCamera() {
         let cam = SCNCamera()
         cam.zNear = 0.05
@@ -484,41 +466,10 @@ final class OceanSceneWorld {
         game.cannonWorldDirection =
             worldDirection
     
-        // ============================================================
-        // ENEMY
-        // ============================================================
-/*
-        if let enemy = game.enemySpaceShip,
-           !enemy.destroyed {
+ 
+            
 
-            enemyRoot.isHidden = false
 
-            enemyRoot.position =
-                enemy.position
-
-            enemyRoot.eulerAngles.z =
-                Float(enemy.lateralAngle)
-
-        } else {
-
-            enemyRoot.isHidden = true
-        }
-*/
-        // ============================================================
-        // ASTEROIDS
-        // ============================================================
-        // Show asteroids only in asteroid section,
-        // or optionally some sparse debris in ocean section.
-        var showAsteroids = false
-        if currentSection == .asteroid {
-            showAsteroids = true
-        } else if currentSection == .ocean {
-            // Optionally show a few asteroids as debris in ocean.
-            // Here we disable asteroids entirely for ocean.
-            showAsteroids = false
-        }
-
-        if showAsteroids {
             var seenA = Set<ObjectIdentifier>()
 
             for asteroid in game.asteroids {
@@ -570,13 +521,7 @@ final class OceanSceneWorld {
                     forKey: id
                 )
             }
-        } else {
-            // Remove all asteroid nodes if we are not showing asteroids
-            for (_, node) in asteroidNodes {
-                node.removeFromParentNode()
-            }
-            asteroidNodes.removeAll()
-        }
+    
 
         // ============================================================
         // SQUID SWARM
@@ -931,6 +876,6 @@ private func rotationFromYAxis(to direction: SCNVector3) -> SCNQuaternion {
     )
 }
 
-// MARK: - CreatureMesh Shark extensions (placeholder)
+
 
 
