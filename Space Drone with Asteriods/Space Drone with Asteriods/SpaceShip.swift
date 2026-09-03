@@ -9,10 +9,10 @@ import Foundation
 import SceneKit
 
 struct SpaceShip {
-    private let oceanMinimumX: CGFloat = -15.0
-    private let oceanMaximumX: CGFloat = 15.0
-    private let oceanSurfaceY: CGFloat = -6.0
-    private let cloudCeilingY: CGFloat = 12.0
+    private let oceanMinimumX: CGFloat = -45.0
+    private let oceanMaximumX: CGFloat = 45.0
+    private let oceanSurfaceY: CGFloat = -16.0
+    private let cloudCeilingY: CGFloat = 42.0
     private let oceanShipClearance: CGFloat = 1.5
     
     var position: SCNVector3 = SCNVector3(
@@ -117,7 +117,7 @@ struct SpaceShip {
         position = SCNVector3(
             Float(worldX),
             Float(worldY),
-            Float(z)
+            Float(0.0)
         )
     }
 
@@ -139,7 +139,7 @@ struct SpaceShip {
 
         let oldX = oceanX
         let oldY = oceanY
-        let oldZ = z
+        let oldZ = 0.0
 
         // --------------------------------------------------------
         // LEFT / RIGHT
@@ -150,6 +150,7 @@ struct SpaceShip {
             lateralSpeed *
             dt
 
+        
         oceanX = max(
             oceanMinimumX,
             min(
@@ -187,8 +188,8 @@ struct SpaceShip {
         // FORWARD
         // --------------------------------------------------------
 
-        z += forwardSpeed * dt
-        progress += forwardSpeed * dt
+       // z += forwardSpeed * dt
+       // progress += forwardSpeed * dt
 
         // --------------------------------------------------------
         // WORLD POSITION
@@ -197,7 +198,7 @@ struct SpaceShip {
         position = SCNVector3(
             Float(oceanX),
             Float(oceanY),
-            Float(z)
+            Float(0.0)
         )
 
         verticalPosition = oceanY
@@ -236,7 +237,7 @@ struct SpaceShip {
             ==================================================
             """)
         }
- */
+*/
     }
     // ============================================================
     // OPTIONAL COMPATIBILITY UPDATE

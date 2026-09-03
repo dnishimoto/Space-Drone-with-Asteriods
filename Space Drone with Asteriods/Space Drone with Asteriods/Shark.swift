@@ -1,8 +1,7 @@
+
 //
 //  Shark.swift
 //  Space Drone with Asteriods
-//
-//  Created by David Nishimoto on 9/2/26.
 //
 
 import Foundation
@@ -12,24 +11,41 @@ final class Shark: Identifiable {
 
     let id = UUID()
 
-    // World-space position
+    // ============================================================
+    // WORLD-SPACE POSITION
+    // ============================================================
+
     var position: SCNVector3
 
-    // Rotation around the tunnel
+    // ============================================================
+    // ROTATION AROUND THE OCEAN
+    // ============================================================
+
     var lateralAngle: CGFloat
 
-    // Animation phase
+    // ============================================================
+    // ANIMATION
+    // ============================================================
+
     var animPhase: Float
 
-    // Destruction state
+    // ============================================================
+    // DESTRUCTION STATE
+    // ============================================================
+
     var destroyed: Bool
 
-    // Movement
+    // ============================================================
+    // MOVEMENT
+    // ============================================================
+
     var forwardSpeed: CGFloat
     var lateralSpeed: CGFloat
-    
     var z: CGFloat
-    
+
+    // ============================================================
+    // INITIALIZER
+    // ============================================================
 
     init(
         position: SCNVector3 = SCNVector3(0, 0, 20),
@@ -40,6 +56,7 @@ final class Shark: Identifiable {
         lateralSpeed: CGFloat = 0,
         z: CGFloat = 0
     ) {
+
         self.position = position
         self.lateralAngle = lateralAngle
         self.animPhase = animPhase
@@ -49,30 +66,42 @@ final class Shark: Identifiable {
         self.z = z
     }
 
-    // MARK: - Update
+    // ============================================================
+    // UPDATE
+    // ============================================================
 
     func update(
         dt: CGFloat,
         shipSpeed: CGFloat,
         playerAngle: Double
     ) {
+
         guard !destroyed else {
             return
         }
 
-        // Move forward through the ocean relative to the player's ship.
-        let relativeSpeed = forwardSpeed + shipSpeed
+        // ========================================================
+        // MOVE FORWARD THROUGH THE OCEAN
+        // ========================================================
+
+        let relativeSpeed =
+            forwardSpeed + shipSpeed
 
         position.z -=
             Float(relativeSpeed * dt)
 
-        // Move around the tunnel/ocean circumference.
+        // ========================================================
+        // MOVE AROUND THE OCEAN
+        // ========================================================
+
         lateralAngle +=
             lateralSpeed * dt
 
-        let twoPi = CGFloat.pi * 2.0
+        let twoPi =
+            CGFloat.pi * 2.0
 
-        // Keep the angle within 0 ... 2π.
+        // Keep angle within 0 ... 2π.
+
         while lateralAngle >= twoPi {
             lateralAngle -= twoPi
         }
@@ -81,13 +110,18 @@ final class Shark: Identifiable {
             lateralAngle += twoPi
         }
 
-        // Gently steer toward the player's lateral position.
-        let targetAngle = CGFloat(playerAngle)
+        // ========================================================
+        // STEER TOWARD PLAYER
+        // ========================================================
+
+        let targetAngle =
+            CGFloat(playerAngle)
 
         var angleDifference =
             targetAngle - lateralAngle
 
         // Normalize angular difference to -π ... +π.
+
         while angleDifference > CGFloat.pi {
             angleDifference -= twoPi
         }
@@ -96,14 +130,18 @@ final class Shark: Identifiable {
             angleDifference += twoPi
         }
 
-        let steeringStrength: CGFloat = 0.65
+        let steeringStrength: CGFloat =
+            0.65
 
         lateralAngle +=
             angleDifference *
             steeringStrength *
             dt
 
-        // Normalize again after steering.
+        // ========================================================
+        // NORMALIZE ANGLE AGAIN
+        // ========================================================
+
         while lateralAngle >= twoPi {
             lateralAngle -= twoPi
         }
@@ -112,17 +150,31 @@ final class Shark: Identifiable {
             lateralAngle += twoPi
         }
 
-        // Preserve the shark's current radial distance.
+        // ========================================================
+        // PRESERVE RADIAL DISTANCE
+        // ========================================================
+
         let radius = sqrt(
             position.x * position.x +
             position.y * position.y
         )
 
-        // Update swimming animation.
-        animPhase += Float(dt * 6.0)
+        // Radius is intentionally preserved here.
+        // The shark's X/Y position is controlled by
+        // SharkManager's hunting and ocean-boundary behavior.
+
+        _ = radius
+
+        // ========================================================
+        // SWIMMING ANIMATION
+        // ========================================================
+
+        animPhase +=
+            Float(dt * 6.0)
 
         if animPhase >= Float.pi * 2.0 {
             animPhase -= Float.pi * 2.0
         }
     }
 }
+

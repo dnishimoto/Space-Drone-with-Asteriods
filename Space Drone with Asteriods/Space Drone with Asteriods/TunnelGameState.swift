@@ -141,10 +141,12 @@ enum TunnelGameState {
         }
         
         gameState.sharkManager.update(game: gameState, dt: dt)
+        
         gameState.swarmManager.update(
             dt: dt,
             shipSpeed: gameState.spaceShip.forwardSpeed, playerAngle: gameState.spaceShip.lateralAngle, progress: gameState.spaceShip.progress
            )
+        
         gameState.flockManager.update(dt:dt,
                                       shipSpeed: gameState.spaceShip.forwardSpeed, playerAngle: gameState.spaceShip.lateralAngle, progress: gameState.spaceShip.progress)
 
@@ -189,7 +191,7 @@ enum TunnelGameState {
                                     in: 0.0..<(2.0 * .pi)
                                 ),
                             playerZ:
-                                game.spaceShip.z,
+                                0.0,
                             spawnDistance:
                                 CGFloat.random(
                                     in: 35.0...55.0
@@ -276,7 +278,6 @@ enum TunnelGameState {
             )
 
         let spawnZ =
-            game.spaceShip.z +
             spawnDistance
 
         // --------------------------------------------------------

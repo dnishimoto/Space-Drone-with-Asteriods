@@ -97,6 +97,7 @@ final class TunnelSceneWorld {
         scene.rootNode.addChildNode(
             laserContainer
         )
+        scene.rootNode.addChildNode(sharkContainer)
     }
 
     // ============================================================
@@ -1073,12 +1074,7 @@ final class TunnelSceneWorld {
             }
         }
 
-        // ============================================================
-        // SHARKS
-        // SharkManager creates and owns the Shark gameplay objects.
-        // OceanSceneWorld creates and owns only the SceneKit nodes.
-        // ============================================================
-
+      
         var seenSharks =
             Set<ObjectIdentifier>()
 
@@ -1154,17 +1150,7 @@ final class TunnelSceneWorld {
                 forKey: id
             )
         }
-        // ============================================================
-        // ENEMY SPACE SHIP
-        //
-        // GameState owns enemySpaceShip.
-        //
-        // The manager/gameplay layer is responsible for creating and
-        // updating the enemy.
-        //
-        // sync() only renders it.
-        // ============================================================
-
+       
         if let enemy =
             gameState.enemySpaceShip {
 

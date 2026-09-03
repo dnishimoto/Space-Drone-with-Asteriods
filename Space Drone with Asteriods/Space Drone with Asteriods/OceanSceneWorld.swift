@@ -221,6 +221,7 @@ final class OceanSceneWorld {
         // ============================================================
 
         camera.addChildNode(cockpitCannonNode)
+      
 
         cockpitCannonNode.position = SCNVector3(
             0,

@@ -8,7 +8,7 @@ final class SharkManager {
 
     // MARK: - Spawn Control
 
-    private var spawnClock: CGFloat = 0
+    private var spawnClock: CGFloat = 0.0
 
     private let spawnInterval: CGFloat = 2.8
 
@@ -36,10 +36,7 @@ final class SharkManager {
         game: GameState,
         dt: CGFloat
     ) {
-        guard game.currentSection == .ocean else {
-            return
-        }
-
+     
         updateSpawning(
             game: game,
             dt: dt
@@ -67,7 +64,7 @@ final class SharkManager {
             return
         }
 
-        spawnClock -= spawnInterval
+        spawnClock = 0.0
 
         spawnShark(
             game: game
@@ -77,6 +74,11 @@ final class SharkManager {
     private func spawnShark(
         game: GameState
     ) {
+
+        // ============================================================
+        // OCEAN-WORLD SPAWN POSITION
+        // ============================================================
+
         let spawnX = CGFloat.random(
             in: minimumOceanX...maximumOceanX
         )
@@ -86,19 +88,23 @@ final class SharkManager {
         )
 
         let spawnDistance = CGFloat.random(
-            in:
-                minimumSpawnDistance...maximumSpawnDistance
+            in: minimumSpawnDistance...maximumSpawnDistance
         )
 
-        let spawnZ =
-            game.spaceShip.position.z +
-            SCNFloat(spawnDistance)
+        let spawnZ = spawnDistance
 
-        let angle =
-            atan2(
-                spawnY,
-                spawnX
-            )
+        // ============================================================
+        // ANGLE
+        // ============================================================
+
+        let angle = atan2(
+            spawnY,
+            spawnX
+        )
+
+        // ============================================================
+        // CREATE SHARK
+        // ============================================================
 
         let shark = Shark(
             position: SCNVector3(
@@ -106,20 +112,24 @@ final class SharkManager {
                 Float(spawnY),
                 Float(spawnZ)
             ),
+
             lateralAngle: angle,
+
             animPhase: Float.random(
                 in: 0...(Float.pi * 2.0)
             ),
+
             destroyed: false,
+
             forwardSpeed: CGFloat.random(
-                in:
-                    minimumSpeed...maximumSpeed
+                in: minimumSpeed...maximumSpeed
             ),
+
             lateralSpeed: CGFloat.random(
-                in:
-                    minimumLateralSpeed...maximumLateralSpeed
+                in: minimumLateralSpeed...maximumLateralSpeed
             ),
-            z: CGFloat(spawnZ)
+
+            z: spawnZ
         )
 
         game.sharks.append(shark)
