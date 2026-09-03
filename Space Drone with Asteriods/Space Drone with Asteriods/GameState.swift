@@ -421,6 +421,8 @@ final class GameState: ObservableObject {
 
 
         frameTick = 0
+        
+        currentSection = .tunnel
 
         start()
     }
