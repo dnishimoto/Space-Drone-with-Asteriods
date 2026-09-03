@@ -22,6 +22,8 @@ import SceneKit
 final class Asteroid {
 
     // MARK: - Common Properties
+    
+    var destroyed: Bool = false
 
     var size: AsteroidSize
 

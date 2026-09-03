@@ -696,6 +696,11 @@ final class TunnelSceneWorld {
         // GameState.currentSection determines whether it is visible.
         // ============================================================
 
+        gameState.spaceShip.update(
+            dt: dt,
+            currentSection: gameState.currentSection
+            )
+        
         let progress =
             gameState.spaceShip.progress
 
@@ -1227,6 +1232,9 @@ final class TunnelSceneWorld {
         processExplosions(
             gameState
         )
+        
+       
+        
     }
     private func syncEnemyShip(
         _ enemy: EnemySpaceShip,

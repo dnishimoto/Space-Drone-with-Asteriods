@@ -14,7 +14,8 @@ import SceneKit
 final class OceanSceneWorld {
     let scene = SCNScene()
     let camera = SCNNode()
-    
+    private let cloudCeilingY: Float = 8.0
+    private let oceanSurfaceY: Float = -6.0
     private var lastSyncTime: TimeInterval = CACurrentMediaTime()
 
     // Camera/HUD-mounted cannon.
@@ -51,7 +52,9 @@ final class OceanSceneWorld {
         scene.fogEndDistance = 95
         setupLighting()
         setupCamera()
+        setupOcean()
         setupShip()
+        setupClouds()
         //setupEnemy()
         scene.rootNode.addChildNode(asteroidContainer)
         scene.rootNode.addChildNode(alienContainer)
@@ -59,7 +62,95 @@ final class OceanSceneWorld {
         scene.rootNode.addChildNode(laserContainer)
         scene.rootNode.addChildNode(sharkContainer) // added shark container to scene
     }
+    private func makeCloud() -> SCNNode {
+        let cloudNode = SCNNode()
 
+        let cloudMaterial = SCNMaterial()
+        cloudMaterial.diffuse.contents = UIColor(
+            white: 0.92,
+            alpha: 0.92
+        )
+        cloudMaterial.specular.contents = UIColor.white
+        cloudMaterial.shininess = 5
+
+        let cloudParts: [(radius: CGFloat, x: Float, y: Float, z: Float)] = [
+            (2.2, -2.2, 0.0, 0.0),
+            (2.8,  0.0, 0.25, 0.0),
+            (2.4,  2.2, 0.0, 0.0),
+            (1.8, -1.0, 0.8, 0.2),
+            (2.0,  1.0, 0.7, 0.1),
+            (1.5,  0.0, 1.1, 0.0)
+        ]
+
+        for part in cloudParts {
+            let sphere = SCNSphere(radius: part.radius)
+            sphere.segmentCount = 16
+            sphere.materials = [cloudMaterial]
+
+            let node = SCNNode(geometry: sphere)
+
+            node.position = SCNVector3(
+                part.x,
+                part.y,
+                part.z
+            )
+
+            // Slightly flatten each cloud vertically.
+            node.scale = SCNVector3(
+                1.0,
+                0.65,
+                0.75
+            )
+
+            cloudNode.addChildNode(node)
+        }
+
+        return cloudNode
+    }
+    private func setupClouds() {
+        let cloudContainer = SCNNode()
+
+        for _ in 0..<25 {
+            let cloud = makeCloud()
+
+            cloud.position = SCNVector3(
+                Float.random(in: -45...45),
+                cloudCeilingY + Float.random(in: -1.0...1.5),
+                Float.random(in: -120...40)
+            )
+
+            cloudContainer.addChildNode(cloud)
+        }
+
+        scene.rootNode.addChildNode(cloudContainer)
+    }
+    private func setupOcean() {
+        let water = SCNPlane(width: 120, height: 200)
+
+        let material = SCNMaterial()
+        material.diffuse.contents = UIColor(
+            red: 0.02,
+            green: 0.18,
+            blue: 0.28,
+            alpha: 1.0
+        )
+        material.specular.contents = UIColor.white
+        material.shininess = 80
+
+        water.materials = [material]
+
+        let waterNode = SCNNode(geometry: water)
+
+        waterNode.eulerAngles.x = -.pi / 2
+
+        waterNode.position = SCNVector3(
+            0,
+            oceanSurfaceY,
+            -40
+        )
+
+        scene.rootNode.addChildNode(waterNode)
+    }
     private func setupLighting() {
         let ambient = SCNNode()
         ambient.light = SCNLight()
@@ -245,25 +336,8 @@ final class OceanSceneWorld {
         shieldNode.isHidden = true
         shipRoot.addChildNode(shieldNode)
 
-        // NOTE: the ship-mounted cannon indicator that used to live here was
-        // removed — it was reusing the same `cannonNode` instance as the
-        // camera-mounted cockpit cannon above, which silently reparented
-        // that node away from the camera (a node can only have one parent)
-        // and broke both its visibility and its aim.
-
         scene.rootNode.addChildNode(shipRoot)
     }
-/*
-    private func setupEnemy() {
-        let geo = SCNCone(topRadius: 0, bottomRadius: 0.32, height: 1.0)
-        geo.firstMaterial?.diffuse.contents = UIColor.red
-        geo.firstMaterial?.emission.contents = UIColor(red: 0.35, green: 0, blue: 0, alpha: 1)
-        enemyRoot.geometry = geo
-        enemyRoot.eulerAngles.x = .pi / 2
-        enemyRoot.isHidden = true
-        scene.rootNode.addChildNode(enemyRoot)
-    }
- */
 
 
     func sync(with gameState: GameState) {
@@ -787,6 +861,14 @@ final class OceanSceneWorld {
         processExplosions(
             gameState
         )
+        
+        print("""
+        [OCEAN SYNC]
+        Game Ship Position:
+            x = \(gameState.spaceShip.position.x)
+            y = \(gameState.spaceShip.position.y)
+            z = \(gameState.spaceShip.position.z)
+        """)
     }
 
 
