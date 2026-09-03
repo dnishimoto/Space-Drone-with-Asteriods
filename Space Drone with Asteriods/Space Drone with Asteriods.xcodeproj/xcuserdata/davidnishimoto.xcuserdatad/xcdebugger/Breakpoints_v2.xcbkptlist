@@ -402,36 +402,6 @@
             endingLineNumber = "1063"
             landmarkName = "sync(with:)"
             landmarkType = "7">
-            <Locations>
-               <Location
-                  uuid = "01874AD0-342D-4228-AFA1-CABAC5A65944 - 29f3786062e4f450"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "Space_Drone_with_Asteriods.TunnelSceneWorld.sync(with: Space_Drone_with_Asteriods.GameState) -&gt; ()"
-                  moduleName = "Space Drone with Asteriods.debug.dylib"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/davidnishimoto/Desktop/Space-Drone-with-Asteriods/Space%20Drone%20with%20Asteriods/Space%20Drone%20with%20Asteriods/TunnelSceneWorld.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "1065"
-                  endingLineNumber = "1065">
-               </Location>
-               <Location
-                  uuid = "01874AD0-342D-4228-AFA1-CABAC5A65944 - 29f3786062e4f450"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "Space_Drone_with_Asteriods.TunnelSceneWorld.sync(with: Space_Drone_with_Asteriods.GameState) -&gt; ()"
-                  moduleName = "Space Drone with Asteriods.debug.dylib"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/davidnishimoto/Desktop/Space-Drone-with-Asteriods/Space%20Drone%20with%20Asteriods/Space%20Drone%20with%20Asteriods/TunnelSceneWorld.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "1065"
-                  endingLineNumber = "1065">
-               </Location>
-            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
    </Breakpoints>
