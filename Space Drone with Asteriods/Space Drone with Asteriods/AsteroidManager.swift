@@ -1,4 +1,3 @@
-
 //
 //  AsteroidManager.swift
 //  Space Drone with Asteriods
@@ -244,29 +243,29 @@ final class AsteroidManager {
     private func spawnOceanAsteroid(
         game: GameState
     ) {
+        let oceanY: CGFloat = 0.0
+        let cloudHeight: CGFloat = 28.0
+
         // ====================================================
         // CURRENT SHIP POSITION
         // ====================================================
 
-        let shipZ = game.spaceShip.z
+        let shipZ = CGFloat(game.spaceShip.position.z)
+        let shipX = CGFloat(game.spaceShip.position.x)
 
         // ====================================================
         // HORIZONTAL POSITION
         // ====================================================
 
-        let x = CGFloat.random(
-            in: -7.0...7.0
-        )
+        let x = shipX + CGFloat.random(in: -2.0...2.0)
 
         // ====================================================
         // STARTING HEIGHT
         //
-        // Asteroids begin between Y 18 and Y 25.
+        // Asteroids begin at cloudHeight.
         // ====================================================
 
-        let y = CGFloat.random(
-            in: 18.0...25.0
-        )
+        let y = cloudHeight
 
         // ====================================================
         // FLOCK-STYLE Z POSITION
@@ -277,35 +276,25 @@ final class AsteroidManager {
         // its Z is calculated from the ship's CURRENT Z.
         // ====================================================
 
-        let flockSpawnOffset = CGFloat.random(
-            in: 35.0...65.0
-        )
-
-        let spawnZ = shipZ + flockSpawnOffset
+        let spawnZ = shipZ + CGFloat.random(in: 25.0...38.0)
 
         // ====================================================
         // DOWNWARD VELOCITY
         // ====================================================
 
-        let verticalVelocity = CGFloat.random(
-            in: -1.1 ... -0.5
-        )
+        let verticalVelocity = CGFloat.random(in: -1.2 ... -0.8)
 
         // ====================================================
         // HORIZONTAL DRIFT
         // ====================================================
 
-        let horizontalVelocity = CGFloat.random(
-            in: -0.8...0.8
-        )
+        let horizontalVelocity = CGFloat.random(in: -0.5...0.5)
 
         // ====================================================
         // GRAVITY
         // ====================================================
 
-        let oceanGravity = CGFloat.random(
-            in: 2.0...3.3
-        )
+        let oceanGravity = CGFloat.random(in: 2.8...3.8)
 
         // ====================================================
         // CREATE ASTEROID
@@ -369,5 +358,18 @@ final class AsteroidManager {
 
         game.asteroids.removeAll()
     }
-}
 
+    public static func clampShipVertical(_ game: GameState) {
+        let oceanY: CGFloat = 0.0
+        let cloudHeight: CGFloat = 28.0
+        var pos = game.spaceShip.position
+        pos.y = max(
+            Float(oceanY),
+            min(
+                Float(cloudHeight),
+                pos.y
+            )
+        )
+        game.spaceShip.position = pos
+    }
+}
