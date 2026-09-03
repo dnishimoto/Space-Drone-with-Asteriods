@@ -33,10 +33,26 @@ func angularDistance(
     return d
 }
 
-// ============================================================
-// VECTOR DISTANCE
-// ============================================================
+func vectorDistance(
+    _ a: SCNVector3,
+    _ b: SCNVector3
+) -> CGFloat {
 
+    let dx =
+        CGFloat(a.x - b.x)
+
+    let dy =
+        CGFloat(a.y - b.y)
+
+    let dz =
+        CGFloat(a.z - b.z)
+
+    return (
+        dx * dx +
+        dy * dy +
+        dz * dz
+    ).squareRoot()
+}
 func distance(
     _ a: SCNVector3,
     _ b: SCNVector3

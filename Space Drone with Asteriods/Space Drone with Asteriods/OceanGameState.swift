@@ -186,13 +186,18 @@ enum OceanGameState {
     // COLLISIONS
     // ============================================================
 
+
+    // ============================================================
+    // MARK: - Collision Detection
+    // ============================================================
+
     private static func checkCollisions(
         game: GameState
     ) {
 
-        // --------------------------------------------------------
+        // ============================================================
         // PLAYER LASERS → SQUIDS
-        // --------------------------------------------------------
+        // ============================================================
 
         for laser in game.playerLasers {
 
@@ -203,34 +208,8 @@ enum OceanGameState {
                 game.swarmManager.squids
                 where !alien.destroyed {
 
-
-                let radius =
-                    Tunnel.radius *
-                    alien.radialOffset
-
                 let position =
-                    SCNVector3(
-
-                        Float(
-                            radius *
-                            CGFloat(
-                                cos(
-                                    alien.lateralAngle
-                                )
-                            )
-                        ),
-
-                        Float(
-                            radius *
-                            CGFloat(
-                                sin(
-                                    alien.lateralAngle
-                                )
-                            )
-                        ),
-
-                        Float(alien.z)
-                    )
+                    alien.position
 
                 if distance(
                     laserPosition,
@@ -242,22 +221,19 @@ enum OceanGameState {
                     game.score += 75
 
                     game.spawnExplosion(
-                        x:
-                            CGFloat(position.x),
-                        y:
-                            CGFloat(position.y),
-                        z:
-                            CGFloat(position.z),
-                        scale:
-                            0.9
+                        x: CGFloat(position.x),
+                        y: CGFloat(position.y),
+                        z: CGFloat(position.z),
+                        scale: 0.9
                     )
                 }
             }
         }
 
-        // --------------------------------------------------------
+
+        // ============================================================
         // PLAYER LASERS → FISH
-        // --------------------------------------------------------
+        // ============================================================
 
         for laser in game.playerLasers {
 
@@ -268,33 +244,8 @@ enum OceanGameState {
                 game.flockManager.aliens
                 where !alien.destroyed {
 
-                let radius =
-                    Tunnel.radius *
-                    alien.radialOffset
-
                 let position =
-                    SCNVector3(
-
-                        Float(
-                            radius *
-                            CGFloat(
-                                cos(
-                                    alien.lateralAngle
-                                )
-                            )
-                        ),
-
-                        Float(
-                            radius *
-                            CGFloat(
-                                sin(
-                                    alien.lateralAngle
-                                )
-                            )
-                        ),
-
-                        Float(alien.z)
-                    )
+                    alien.position
 
                 if distance(
                     laserPosition,
@@ -306,38 +257,59 @@ enum OceanGameState {
                     game.score += 60
 
                     game.spawnExplosion(
-                        x:
-                            CGFloat(position.x),
-                        y:
-                            CGFloat(position.y),
-                        z:
-                            CGFloat(position.z),
-                        scale:
-                            0.85
+                        x: CGFloat(position.x),
+                        y: CGFloat(position.y),
+                        z: CGFloat(position.z),
+                        scale: 0.85
                     )
                 }
             }
         }
 
-        // --------------------------------------------------------
-        // SHIP → SQUID
-        // --------------------------------------------------------
 
-        let shipAngle =
-            game.spaceShip.lateralAngle
+        // ============================================================
+        // IMPORTANT:
+        // FROM THIS POINT ON, COLLISIONS ARE FOR THE OCEAN WORLD.
+        //
+        // Ocean objects use their actual 3D position.
+        //
+        // We do NOT use:
+        //
+        //     Tunnel.radius
+        //     lateralAngle
+        //     radialOffset
+        //
+        // for ocean collision detection.
+        // ============================================================
+
+
+        // ============================================================
+        // SHIP POSITION
+        // ============================================================
+
+        let shipPosition =
+            game.spaceShip.position
+
+
+        // ============================================================
+        // SHIP → SQUID
+        // ============================================================
 
         for alien in
             game.swarmManager.squids
             where !alien.destroyed {
 
-            if hitsShip(
-                angle:
-                    alien.lateralAngle,
-                z:
-                    alien.z,
-                shipAngle:
-                    shipAngle
-            ) {
+            let alienPosition =
+                alien.position
+
+            if distance(
+                shipPosition,
+                alienPosition
+            ) <= 1.5 {
+
+                // ----------------------------------------------------
+                // SHIELD
+                // ----------------------------------------------------
 
                 if game.shieldActive {
 
@@ -346,32 +318,38 @@ enum OceanGameState {
                     continue
                 }
 
-                game.score =
-                    max(
-                        0,
-                        game.score - 25
-                    )
+                // ----------------------------------------------------
+                // NO SHIELD = GAME OVER
+                // ----------------------------------------------------
 
-                alien.destroyed = true
+                game.gameOver = true
+
+                game.stopFiring()
+
+                return
             }
         }
 
-        // --------------------------------------------------------
+
+        // ============================================================
         // SHIP → FISH
-        // --------------------------------------------------------
+        // ============================================================
 
         for alien in
             game.flockManager.aliens
             where !alien.destroyed {
 
-            if hitsShip(
-                angle:
-                    alien.lateralAngle,
-                z:
-                    alien.z,
-                shipAngle:
-                    shipAngle
-            ) {
+            let alienPosition =
+                alien.position
+
+            if distance(
+                shipPosition,
+                alienPosition
+            ) <= 1.5 {
+
+                // ----------------------------------------------------
+                // SHIELD
+                // ----------------------------------------------------
 
                 if game.shieldActive {
 
@@ -380,31 +358,41 @@ enum OceanGameState {
                     continue
                 }
 
-                game.score =
-                    max(
-                        0,
-                        game.score - 20
-                    )
+                // ----------------------------------------------------
+                // NO SHIELD = GAME OVER
+                // ----------------------------------------------------
 
-                alien.destroyed = true
+                game.gameOver = true
+
+                game.stopFiring()
+
+                return
             }
         }
 
-        // --------------------------------------------------------
+
+        // ============================================================
         // SHIP → SHARK
-        // --------------------------------------------------------
+        //
+        // Sharks are major ocean enemies.
+        // A shark collision causes immediate Game Over unless
+        // the shield is active.
+        // ============================================================
 
         for shark in game.sharks
-        where !shark.destroyed {
+            where !shark.destroyed {
 
-            if hitsShip(
-                angle:
-                    shark.lateralAngle,
-                z:
-                    shark.z,
-                shipAngle:
-                    shipAngle
-            ) {
+            let sharkPosition =
+                shark.position
+
+            if distance(
+                shipPosition,
+                sharkPosition
+            ) <= 1.8 {
+
+                // ----------------------------------------------------
+                // SHIELD
+                // ----------------------------------------------------
 
                 if game.shieldActive {
 
@@ -413,13 +401,98 @@ enum OceanGameState {
                     continue
                 }
 
-                // Shark is a major Ocean opponent.
+                // ----------------------------------------------------
+                // SHARK HIT
+                // ----------------------------------------------------
+
                 game.gameOver = true
 
                 game.stopFiring()
+
+                return
+            }
+        }
+
+        let laserList =
+            game.playerLasers
+        
+        for laser in laserList {
+
+            let laserPosition =
+                laser.worldPosition()
+
+            for asteroid in game.asteroids {
+
+                let asteroidPosition =
+                    asteroid.tunnelPosition
+
+                let collisionRadius: CGFloat
+
+                switch asteroid.size {
+
+                case .small:
+                    collisionRadius = 1.1
+
+                case .medium:
+                    collisionRadius = 1.5
+
+                case .large:
+                    collisionRadius = 2.1
+                }
+
+                let distance =
+                    vectorDistance(
+                        laserPosition,
+                        asteroidPosition
+                    )
+
+                if distance <= collisionRadius {
+                    
+
+                    game.score +=
+                        asteroid.size.score
+
+                    game.spawnExplosion(
+                        x:
+                            CGFloat(
+                                asteroidPosition.x
+                            ),
+                        y:
+                            CGFloat(
+                                asteroidPosition.y
+                            ),
+                        z:
+                            CGFloat(
+                                asteroidPosition.z
+                            ),
+                        scale:
+                            asteroid.size == .large
+                            ? 1.6
+                            : 1.0
+                    )
+
+                    // Mark for removal by removing the
+                    // asteroid from GameState.
+
+                    if let index =
+                        game.asteroids.firstIndex(
+                            where: {
+                                $0 === asteroid
+                            }
+                        ) {
+
+                        game.asteroids.remove(
+                            at: index
+                        )
+                    }
+
+                    break
+                }
             }
         }
     }
+
+
 
     // ============================================================
     // SHIP COLLISION
