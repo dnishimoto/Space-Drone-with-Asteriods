@@ -474,23 +474,23 @@ final class OceanSceneWorld {
         // Ship rotation around the tunnel is retained for
         // compatibility with the tunnel section.
 
-        shipRoot.eulerAngles.z =
-            Float(
-                gameState.spaceShip.lateralAngle
-            )
+        //shipRoot.eulerAngles.z =
+         //   Float(
+        //        gameState.spaceShip.lateralAngle
+        //    )
    
      
             // Ocean camera stays level.
 
-            camera.eulerAngles.x = 0
-            camera.eulerAngles.y = .pi
-            camera.eulerAngles.z = 0
+           // camera.eulerAngles.x = 0
+          //  camera.eulerAngles.y = .pi
+         //   camera.eulerAngles.z = 0
 
-            camera.position = SCNVector3(
-                0,
-                0.3,
-                -2.8
-            )
+         //   camera.position = SCNVector3(
+        //        0,
+       //         0.3,
+        //        -2.8
+        //    )
 
     
 
