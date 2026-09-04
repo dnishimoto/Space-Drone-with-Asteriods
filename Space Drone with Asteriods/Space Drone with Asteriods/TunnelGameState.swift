@@ -754,7 +754,7 @@ enum TunnelGameState {
                     // ----------------------------------------------------
                     // SHARK HIT = GAME OVER
                     // ----------------------------------------------------
-
+/*
                     print(
                         "GAME OVER: SHARK hit spaceship"
                     )
@@ -766,7 +766,7 @@ enum TunnelGameState {
                     print(
                         "  Shark position: \(sharkPosition)"
                     )
-
+*/
                     game.gameOver = true
 
                     game.stopFiring()
@@ -803,13 +803,13 @@ enum TunnelGameState {
                     )
 
                     if collisionDistance <= collisionRadius {
-
+/*
                         print("LASER HIT SHARK")
                         print("  Laser position: \(laserPosition)")
                         print("  Shark position: \(sharkPosition)")
                         print("  Collision distance: \(collisionDistance)")
                         print("  Collision radius: \(collisionRadius)")
-
+*/
                         // Destroy the shark.
                         shark.destroyed = true
 

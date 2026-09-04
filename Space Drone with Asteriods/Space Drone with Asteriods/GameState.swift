@@ -55,8 +55,8 @@ final class GameState: ObservableObject {
     // GAME
     // ============================================================
 
-    //@Published var score = 20_000
-    @Published var score = 0
+    @Published var score = 20_000
+    //@Published var score = 0
 
     @Published var gameOver = false
 
@@ -262,6 +262,7 @@ final class GameState: ObservableObject {
 
         let direction =
             cannonWorldDirection.normalized
+        
 
         guard direction.length > 0.000001 else {
             return

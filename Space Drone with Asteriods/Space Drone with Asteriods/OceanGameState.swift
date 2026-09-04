@@ -320,7 +320,7 @@ enum OceanGameState {
                 // ----------------------------------------------------
                 // NO SHIELD = GAME OVER
                 // ----------------------------------------------------
-
+/*
                 print(
                     "GAME OVER: SQUID hit spaceship"
                 )
@@ -332,7 +332,7 @@ enum OceanGameState {
                 print(
                     "  Squid position: \(alienPosition)"
                 )
-                
+  */
                 game.score -= 5
 
                 return
@@ -370,7 +370,7 @@ enum OceanGameState {
                 // ----------------------------------------------------
                 // NO SHIELD = GAME OVER
                 // ----------------------------------------------------
-
+/*
                 print(
                     "GAME OVER: FISH hit spaceship"
                 )
@@ -382,7 +382,7 @@ enum OceanGameState {
                 print(
                     "  Fish position: \(alienPosition)"
                 )
-
+*/
                 game.score -= 5
 
                 return
@@ -424,7 +424,7 @@ enum OceanGameState {
                 // ----------------------------------------------------
                 // SHARK HIT = GAME OVER
                 // ----------------------------------------------------
-
+/*
                 print(
                     "GAME OVER: SHARK hit spaceship"
                 )
@@ -436,6 +436,7 @@ enum OceanGameState {
                 print(
                     "  Shark position: \(sharkPosition)"
                 )
+ */
 
                 game.gameOver = true
 
@@ -579,7 +580,7 @@ enum OceanGameState {
                 // ----------------------------------------------------
                 // ASTEROID HIT = GAME OVER
                 // ----------------------------------------------------
-
+/*
                 print(
                     "GAME OVER: \(asteroid.size) ASTEROID hit spaceship"
                 )
@@ -600,7 +601,7 @@ enum OceanGameState {
                     "  Collision radius: \(spaceshipCollisionRadius)"
                 )
 
-
+*/
                 game.spawnExplosion(
                     x: CGFloat(
                         spaceshipPosition.x
@@ -670,13 +671,13 @@ enum OceanGameState {
                 )
 
                 if collisionDistance <= collisionRadius {
-
+/*
                     print("LASER HIT SHARK")
                     print("  Laser position: \(laserPosition)")
                     print("  Shark position: \(sharkPosition)")
                     print("  Collision distance: \(collisionDistance)")
                     print("  Collision radius: \(collisionRadius)")
-
+*/
                     // Destroy the shark.
                     shark.destroyed = true
 

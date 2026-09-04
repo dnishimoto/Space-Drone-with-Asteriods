@@ -1,13 +1,5 @@
-
-//
-//  Laser.swift
-//  Space Drone with Asteriods
-//
-//  Created by David Nishimoto on 8/30/26.
-//
-
-import Foundation
 import SceneKit
+import CoreGraphics
 
 struct Laser {
 
@@ -83,58 +75,139 @@ struct Laser {
         self.distance = 0.0
 
         // ========================================================
-        // PLAYER LASER
+        // FIRING DIRECTION
         //
-        // IMPORTANT:
+        // The supplied direction should normally come from the
+        // live cannon muzzle node's presentation-world transform.
         //
-        // The camera is rotated 180 degrees around Y.
+        // Rotate that world-space direction by 90° upward around
+        // the world X axis.
         //
-        // Therefore:
+        // SceneKit right-handed X rotation:
         //
-        //     cannon local -Z
-        //              ↓
-        //          world +Z
+        //     input +Z forward
         //
-        // The player laser must therefore use +Z as its neutral
-        // world-space forward direction.
+        //     pitch = -π / 2
+        //
+        //     becomes +Y upward
+        //
+        // Use +π / 2 instead if you want the laser to rotate
+        // downward:
+        //
+        //     +Z -> -Y
         // ========================================================
 
-        if isPlayerLaser {
+        let pitch90Up = -Float.pi / 2.0
+        
+        let laterallyRotatedDirection = Laser.rotatedByYaw(
+            direction,
+            yawRadians: Float(lateralAngle)
+        )
 
-            self.direction = Laser.makeCannonDirection(
-                yaw: lateralAngle,
-                pitch: elevationAngle
+        print(laterallyRotatedDirection.x,laterallyRotatedDirection.y,laterallyRotatedDirection.z)
+
+        self.direction = Laser.rotatedByPitch(
+            laterallyRotatedDirection,
+            pitchRadians: pitch90Up
+        )
+        
+        /*
+        self.direction = Laser.rotatedByYaw(
+            direction,
+            yawRadians: Float(lateralAngle)
+            
+        )
+         */
+        
+    }
+    static func rotatedByYaw(
+        _ direction: SCNVector3,
+        yawRadians: Float
+    ) -> SCNVector3 {
+
+        let cosYaw = cos(yawRadians)
+        let sinYaw = sin(yawRadians)
+
+        let rotated = SCNVector3(
+            direction.x * cosYaw + direction.z * sinYaw,
+            direction.y,
+            -direction.x * sinYaw + direction.z * cosYaw
+        )
+
+        return normalizedDirection(
+            rotated
+        )
+    }
+
+    // ============================================================
+    // DIRECTION ROTATION
+    // ============================================================
+
+    /// Rotates a direction around the fixed world X axis.
+    ///
+    /// Positive pitch:
+    ///     +Z forward -> -Y down
+    ///
+    /// Negative pitch:
+    ///     +Z forward -> +Y up
+    ///
+    /// This uses the standard X-axis rotation:
+    ///
+    ///     x' = x
+    ///     y' = y cos(θ) - z sin(θ)
+    ///     z' = y sin(θ) + z cos(θ)
+    /// ============================================================
+
+    static func rotatedByPitch(
+        _ direction: SCNVector3,
+        pitchRadians: Float
+    ) -> SCNVector3 {
+
+        let cosPitch = cos(pitchRadians)
+        let sinPitch = sin(pitchRadians)
+
+        let rotated = SCNVector3(
+            direction.x,
+            direction.y * cosPitch - direction.z * sinPitch,
+            direction.y * sinPitch + direction.z * cosPitch
+        )
+
+        return normalizedDirection(rotated)
+    }
+
+    // ============================================================
+    // NORMALIZATION
+    // ============================================================
+
+    /// Returns a normalized direction vector.
+    ///
+    /// Falls back to world forward (+Z) if the input direction has
+    /// effectively zero length.
+    // ============================================================
+
+    static func normalizedDirection(
+        _ vector: SCNVector3
+    ) -> SCNVector3 {
+
+        let length = sqrt(
+            vector.x * vector.x +
+            vector.y * vector.y +
+            vector.z * vector.z
+        )
+
+        guard length > 0.000001 else {
+            return SCNVector3(
+                0,
+                0,
+                1
             )
-
-        } else {
-
-            // ====================================================
-            // ENEMY LASER
-            // ====================================================
-
-            let length = sqrt(
-                direction.x * direction.x +
-                direction.y * direction.y +
-                direction.z * direction.z
-            )
-
-            if length > 0.000001 {
-
-                self.direction = SCNVector3(
-                    direction.x / length,
-                    direction.y / length,
-                    direction.z / length
-                )
-
-            } else {
-
-                self.direction = SCNVector3(
-                    0,
-                    0,
-                    1
-                )
-            }
         }
+
+        return SCNVector3(
+            vector.x / length,
+            vector.y / length,
+            vector.z / length
+        )
     }
 
     // ============================================================
@@ -150,6 +223,13 @@ struct Laser {
     //     +Z
     //
     // because the camera is rotated 180 degrees around Y.
+    //
+    // NOTE:
+    //
+    // Player lasers should normally use the real live direction
+    // calculated from muzzleNode.presentation instead of this
+    // trig helper. This helper remains useful if a future system
+    // needs a direction derived only from yaw/pitch angles.
     // ============================================================
 
     static func makeCannonDirection(
@@ -157,66 +237,18 @@ struct Laser {
         pitch: Double
     ) -> SCNVector3 {
 
-        // ========================================================
-        // STARTING WORLD FORWARD
-        // ========================================================
-
-        let forward = SCNVector3(
-            0,
-            0,
-            1
-        )
-
-        // ========================================================
-        // TRANSFORMATION #1 — YAW
+        // Starting world-forward direction:
         //
-        // The visible cannon uses:
+        //     +Z
         //
-        //     cockpitCannonNode.eulerAngles.y = -yaw
-        //
-        // because the camera itself is rotated by PI.
-        //
-        // Therefore the matching world-space yaw is:
-        //
-        //     x = -sin(yaw)
-        //     z =  cos(yaw)
-        // ========================================================
-
         let sinYaw = sin(yaw)
         let cosYaw = cos(yaw)
 
-        let yawDirection = SCNVector3(
-            forward.x * Float(cosYaw) + forward.z * Float(-sinYaw),
-            0.0,
-            -forward.x * Float(-sinYaw) + forward.z * Float(cosYaw)
-        )
-
-        // With forward = (0,0,1), this simplifies to:
-        //
-        //     (-sin(yaw), 0, cos(yaw))
-        //
-        // Keep that explicit result.
-
         let yawedDirection = SCNVector3(
             -Float(sinYaw),
-             0.0,
+            0.0,
             Float(cosYaw)
         )
-
-        // ========================================================
-        // TRANSFORMATION #2 — PITCH
-        //
-        // Pitch is applied AFTER yaw.
-        //
-        // Positive elevation means UP.
-        //
-        // Therefore:
-        //
-        //     Y = +sin(pitch)
-        //
-        // while the horizontal component is reduced by
-        // cos(pitch).
-        // ========================================================
 
         let sinPitch = sin(pitch)
         let cosPitch = cos(pitch)
@@ -227,34 +259,7 @@ struct Laser {
             yawedDirection.z * Float(cosPitch)
         )
 
-        // ========================================================
-        // NORMALIZE
-        // ========================================================
-
-        let length = sqrt(
-            pitchedDirection.x * pitchedDirection.x +
-            pitchedDirection.y * pitchedDirection.y +
-            pitchedDirection.z * pitchedDirection.z
-        )
-
-        if length > 0.000001 {
-
-            return SCNVector3(
-                pitchedDirection.x / length,
-                pitchedDirection.y / length,
-                pitchedDirection.z / length
-            )
-        }
-
-        // ========================================================
-        // SAFE FALLBACK
-        // ========================================================
-
-        return SCNVector3(
-            0,
-            0,
-            1
-        )
+        return normalizedDirection(pitchedDirection)
     }
 
     // ============================================================
@@ -270,10 +275,12 @@ struct Laser {
 
         if isPlayerLaser {
 
+            // Player laser is already moving through world space.
             travelSpeed = Laser.speed
 
         } else {
 
+            // Enemy lasers compensate for forward tunnel motion.
             travelSpeed = Laser.speed + shipSpeed
         }
 
@@ -320,4 +327,3 @@ struct Laser {
         )
     }
 }
-

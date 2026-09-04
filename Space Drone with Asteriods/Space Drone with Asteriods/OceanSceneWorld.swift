@@ -45,23 +45,31 @@ final class OceanSceneWorld {
     private let muzzleNode = SCNNode()
     private let cannonBarrelPivot = SCNNode()
 
-    init() {
-        scene.background.contents = UIColor.black
-        scene.fogColor = UIColor(red: 0.02, green: 0.02, blue: 0.06, alpha: 1)
-        scene.fogStartDistance = 25
-        scene.fogEndDistance = 95
-        setupLighting()
-        setupCamera()
-        setupOcean()
-        setupShip()
-        setupClouds()
-        //setupEnemy()
-        scene.rootNode.addChildNode(asteroidContainer)
-        scene.rootNode.addChildNode(alienContainer)
-        scene.rootNode.addChildNode(flockContainer)
-        scene.rootNode.addChildNode(laserContainer)
-        scene.rootNode.addChildNode(sharkContainer) // added shark container to scene
-    }
+
+        init() {
+            scene.background.contents = UIColor.black
+            scene.fogColor = UIColor(red: 0.02, green: 0.02, blue: 0.06, alpha: 1)
+            scene.fogStartDistance = 25
+            scene.fogEndDistance = 95
+            setupLighting()
+            setupCamera()
+            setupOcean()
+            setupShip()
+            setupClouds()
+            //setupEnemy()
+            scene.rootNode.addChildNode(asteroidContainer)
+            scene.rootNode.addChildNode(alienContainer)
+            scene.rootNode.addChildNode(flockContainer)
+            // laserContainer is a child of the cannon barrel (built inside
+            // setupCamera() -> setupCockpitCannon()), so fired lasers spawn
+            // relative to the gun. Per-laser world position is still
+            // preserved every frame via coordinate conversion in
+            // makeLaserNode(), so shots still travel correctly through
+            // world space even as the cannon aims.
+            cannonBarrel.addChildNode(laserContainer)
+            scene.rootNode.addChildNode(sharkContainer) // added shark container to scene
+        }
+
     private func makeCloud() -> SCNNode {
         let cloudNode = SCNNode()
 
@@ -198,18 +206,23 @@ final class OceanSceneWorld {
     }
   
     private func setupCamera() {
-        let cam = SCNCamera()
-        cam.zNear = 0.05
-        cam.zFar = 200
-        cam.fieldOfView = 72
-        camera.camera = cam
-        camera.position = SCNVector3(0, 0.3, -2.8)
-        camera.eulerAngles.y = .pi   // look down +Z
-        scene.rootNode.addChildNode(camera)
+           let cam = SCNCamera()
+           cam.zNear = 0.05
+           cam.zFar = 200
+           cam.fieldOfView = 72
+           camera.camera = cam
+           camera.position = SCNVector3(0, 0.3, -2.8)
+           camera.eulerAngles.y = .pi   // look down +Z
 
-        setupCockpitCannon()
-    }
+           // The camera is a child of the ship root, so it automatically
+           // inherits the ship's world position/rotation every frame
+           // without needing to be manually re-synced in sync(). This
+           // position (0, 0.3, -2.8) is now a fixed LOCAL offset from
+           // the ship, not a world position.
+           shipRoot.addChildNode(camera)
 
+           setupCockpitCannon()
+       }
     private func setupCockpitCannon() {
         cockpitCannonNode.removeFromParentNode()
         cannonBarrelPivot.removeFromParentNode()
@@ -862,7 +875,7 @@ final class OceanSceneWorld {
         processExplosions(
             gameState
         )
-        
+        /*
         print("""
         [OCEAN SYNC]
         Game Ship Position:
@@ -870,6 +883,7 @@ final class OceanSceneWorld {
             y = \(gameState.spaceShip.position.y)
             z = \(gameState.spaceShip.position.z)
         """)
+         */
     }
 
 
@@ -1056,8 +1070,28 @@ final class OceanSceneWorld {
         let container = SCNNode()
         container.addChildNode(laserNode)
 
-        // Laser starting position.
-        container.position = laser.worldPosition()
+        // --------------------------------------------------
+        // Parent to laserContainer BEFORE computing position/
+        // orientation. laserContainer is nested under the cannon
+        // barrel now, so its own transform moves as the cannon
+        // aims — parenting first lets SceneKit resolve the
+        // world-space math below against the correct (current)
+        // parent chain.
+        // --------------------------------------------------
+
+        laserContainer.addChildNode(container)
+
+        // Laser starting position, in world space.
+        let worldPosition = laser.worldPosition()
+
+        // Convert into laserContainer's local space so the laser
+        // still renders at its true world position even though
+        // its parent (the cannon) may be aiming somewhere else.
+        container.position =
+            laserContainer.convertPosition(
+                worldPosition,
+                from: nil
+            )
 
         // --------------------------------------------------
         // Laser movement direction.
@@ -1070,15 +1104,19 @@ final class OceanSceneWorld {
         }
 
         // Point the container in exactly the same direction
-        // that the Laser uses for movement.
-        let end = SCNVector3(
-            container.position.x + direction.x,
-            container.position.y + direction.y,
-            container.position.z + direction.z
+        // that the Laser uses for movement. look(at:) resolves
+        // its target in world space regardless of the node's
+        // parent, so passing the true world-space end point here
+        // is correct even though container's position is stored
+        // in laserContainer-local coordinates.
+        let worldEnd = SCNVector3(
+            worldPosition.x + direction.x,
+            worldPosition.y + direction.y,
+            worldPosition.z + direction.z
         )
 
         container.look(
-            at: end,
+            at: worldEnd,
             up: SCNVector3(0, 1, 0),
             localFront: SCNVector3(0, 0, -1)
         )

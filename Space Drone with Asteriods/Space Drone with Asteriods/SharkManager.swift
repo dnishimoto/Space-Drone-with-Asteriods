@@ -264,7 +264,7 @@ final class SharkManager {
                 shark.position,
                 shipPosition
             )
-
+/*
         print(
             "================================================"
         )
@@ -295,6 +295,7 @@ final class SharkManager {
         print(
             "================================================"
         )
+ */
     }
 
     // MARK: - Shark Behavior
@@ -512,15 +513,16 @@ final class SharkManager {
         // ============================================================
         // ATTACK DEBUG
         // ============================================================
-
+/*
         if distance < 15.0 {
-
+            
             print(
                 "SHARK ATTACK RANGE | " +
                 "Distance: \(distance) | " +
                 "Hunt Factor: \(huntingFactor)"
             )
         }
+ */
     }
 
     // MARK: - Cellular Automata Rule

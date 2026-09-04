@@ -331,34 +331,23 @@ final class TunnelSceneWorld {
     // ============================================================
 
     private func setupCamera() {
+           let cam = SCNCamera()
+           cam.zNear = 0.05
+           cam.zFar = 200
+           cam.fieldOfView = 72
+           camera.camera = cam
+           camera.position = SCNVector3(0, 0.3, -2.8)
+           camera.eulerAngles.y = .pi   // look down +Z
 
-        let cam =
-            SCNCamera()
+           // The camera is a child of the ship root, so it automatically
+           // inherits the ship's world position/rotation every frame
+           // without needing to be manually re-synced in sync(). This
+           // position (0, 0.3, -2.8) is now a fixed LOCAL offset from
+           // the ship, not a world position.
+           shipRoot.addChildNode(camera)
 
-        cam.zNear = 0.05
-        cam.zFar = 200
-        cam.fieldOfView = 72
-
-        camera.camera = cam
-
-        camera.position =
-            SCNVector3(
-                0,
-                0.3,
-                -2.8
-            )
-
-        // Camera looks down +Z.
-        camera.eulerAngles.y =
-            .pi
-
-        scene.rootNode.addChildNode(
-            camera
-        )
-
-        setupCockpitCannon()
-    }
-
+           setupCockpitCannon()
+       }
     // ============================================================
     // COCKPIT CANNON
     // ============================================================
@@ -1387,89 +1376,73 @@ final class TunnelSceneWorld {
         color: UIColor
     ) -> SCNNode {
 
-        let geo =
-            SCNCylinder(
-                radius: 0.05,
-                height: 0.75
-            )
+        let geo = SCNCylinder(
+            radius: 0.05,
+            height: 0.75
+        )
 
-        geo.firstMaterial?.diffuse.contents =
-            color
+        geo.firstMaterial?.diffuse.contents = color
+        geo.firstMaterial?.emission.contents = color
 
-        geo.firstMaterial?.emission.contents =
-            color
-
-        let laserNode =
-            SCNNode(
-                geometry: geo
-            )
+        let laserNode = SCNNode(geometry: geo)
 
         // SCNCylinder's long axis is +Y.
         //
-        // Rotate the cylinder so its long axis
-        // follows local -Z.
+        // Rotate the cylinder so its long axis follows -Z.
+        laserNode.eulerAngles.x = -.pi / 2.0
 
-        laserNode.eulerAngles.x =
-            -.pi / 2.0
+        let container = SCNNode()
+        container.addChildNode(laserNode)
 
-        let container =
-            SCNNode()
+        // --------------------------------------------------
+        // Parent to laserContainer BEFORE computing position/
+        // orientation. laserContainer is nested under the cannon
+        // barrel now, so its own transform moves as the cannon
+        // aims — parenting first lets SceneKit resolve the
+        // world-space math below against the correct (current)
+        // parent chain.
+        // --------------------------------------------------
 
-        container.addChildNode(
-            laserNode
-        )
+        laserContainer.addChildNode(container)
 
-        // ========================================================
-        // LASER STARTING POSITION
-        // ========================================================
+        // Laser starting position, in world space.
+        let worldPosition = laser.worldPosition()
 
+        // Convert into laserContainer's local space so the laser
+        // still renders at its true world position even though
+        // its parent (the cannon) may be aiming somewhere else.
         container.position =
-            laser.worldPosition()
+            laserContainer.convertPosition(
+                worldPosition,
+                from: nil
+            )
 
-        // ========================================================
-        // LASER MOVEMENT DIRECTION
-        // ========================================================
+        // --------------------------------------------------
+        // Laser movement direction.
+        // --------------------------------------------------
 
-        let direction =
-            laser.direction.normalized
+        let direction = laser.direction.normalized
 
-        guard
-            direction.length >
-            0.000001
-        else {
+        guard direction.length > 0.000001 else {
             return container
         }
 
-        // Point the visual laser in exactly
-        // the same direction used by the Laser
-        // physics.
-
-        let end =
-            SCNVector3(
-                container.position.x +
-                    direction.x,
-
-                container.position.y +
-                    direction.y,
-
-                container.position.z +
-                    direction.z
-            )
+        // Point the container in exactly the same direction
+        // that the Laser uses for movement. look(at:) resolves
+        // its target in world space regardless of the node's
+        // parent, so passing the true world-space end point here
+        // is correct even though container's position is stored
+        // in laserContainer-local coordinates.
+        let worldEnd = SCNVector3(
+            worldPosition.x + direction.x,
+            worldPosition.y + direction.y,
+            worldPosition.z + direction.z
+        )
 
         container.look(
-            at: end,
-            up:
-                SCNVector3(
-                    0,
-                    1,
-                    0
-                ),
-            localFront:
-                SCNVector3(
-                    0,
-                    0,
-                    -1
-                )
+            at: worldEnd,
+            up: SCNVector3(0, 1, 0),
+            localFront: SCNVector3(0, 0, -1)
         )
 
         return container
