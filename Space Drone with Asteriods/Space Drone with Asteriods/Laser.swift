@@ -65,6 +65,8 @@ struct Laser {
 
         self.origin = origin
 
+        self.direction = Laser.normalizedDirection(direction)
+
         self.stepSize = max(
             stepSize,
             0.000001
@@ -73,52 +75,6 @@ struct Laser {
         self.isPlayerLaser = isPlayerLaser
 
         self.distance = 0.0
-
-        // ========================================================
-        // FIRING DIRECTION
-        //
-        // The supplied direction should normally come from the
-        // live cannon muzzle node's presentation-world transform.
-        //
-        // Rotate that world-space direction by 90° upward around
-        // the world X axis.
-        //
-        // SceneKit right-handed X rotation:
-        //
-        //     input +Z forward
-        //
-        //     pitch = -π / 2
-        //
-        //     becomes +Y upward
-        //
-        // Use +π / 2 instead if you want the laser to rotate
-        // downward:
-        //
-        //     +Z -> -Y
-        // ========================================================
-
-        let pitch90Up = -Float.pi / 2.0
-        
-        let laterallyRotatedDirection = Laser.rotatedByYaw(
-            direction,
-            yawRadians: Float(lateralAngle)
-        )
-
-        print(laterallyRotatedDirection.x,laterallyRotatedDirection.y,laterallyRotatedDirection.z)
-
-        self.direction = Laser.rotatedByPitch(
-            laterallyRotatedDirection,
-            pitchRadians: pitch90Up
-        )
-        
-        /*
-        self.direction = Laser.rotatedByYaw(
-            direction,
-            yawRadians: Float(lateralAngle)
-            
-        )
-         */
-        
     }
     static func rotatedByYaw(
         _ direction: SCNVector3,

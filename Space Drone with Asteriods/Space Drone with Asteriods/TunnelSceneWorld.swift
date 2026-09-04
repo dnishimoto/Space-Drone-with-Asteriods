@@ -353,155 +353,104 @@ final class TunnelSceneWorld {
     // ============================================================
 
     private func setupCockpitCannon() {
-
-        // Remove any previous hierarchy.
-        //
-        // This makes setup safe if it is ever called again.
-
         cockpitCannonNode.removeFromParentNode()
-
         cannonBarrelPivot.removeFromParentNode()
-
         cannonBarrel.removeFromParentNode()
-
         muzzleNode.removeFromParentNode()
 
-        // ========================================================
+        // ============================================================
         // COCKPIT ROOT
-        // ========================================================
+        // ============================================================
 
-        camera.addChildNode(
-            cockpitCannonNode
+        camera.addChildNode(cockpitCannonNode)
+      
+
+        cockpitCannonNode.position = SCNVector3(
+            0,
+            -0.25,
+            -0.9
         )
 
-        cockpitCannonNode.position =
-            SCNVector3(
-                0,
-                -0.25,
-                -0.9
-            )
+        cockpitCannonNode.eulerAngles = SCNVector3(
+            0,
+            0,
+            0
+        )
 
-        cockpitCannonNode.eulerAngles =
-            SCNVector3(
-                0,
-                0,
-                0
-            )
-
-        // ========================================================
+        // ============================================================
         // REAR-END HINGE
-        // ========================================================
+        // ============================================================
 
-        // The pivot is located at the rear
-        // end of the cannon barrel.
-
-        cannonBarrelPivot.position =
-            SCNVector3(
-                0,
-                0,
-                0
-            )
-
-        cannonBarrelPivot.eulerAngles =
-            SCNVector3(
-                0,
-                0,
-                0
-            )
-
-        cockpitCannonNode.addChildNode(
-            cannonBarrelPivot
+        cannonBarrelPivot.position = SCNVector3(
+            0,
+            0,
+            0
         )
 
-        // ========================================================
+        cannonBarrelPivot.eulerAngles = SCNVector3(
+            0,
+            0,
+            0
+        )
+
+        cockpitCannonNode.addChildNode(cannonBarrelPivot)
+
+        // ============================================================
         // BARREL
-        // ========================================================
+        // ============================================================
 
-        let barrelLength: Float =
-            0.72
+        let barrelLength: Float = 0.72
+        let halfLength = barrelLength * 0.5
 
-        let halfLength =
-            barrelLength * 0.5
-
-        let barrelGeometry =
-            SCNCylinder(
-                radius: 0.055,
-                height: CGFloat(
-                    barrelLength
-                )
-            )
-
-        barrelGeometry.firstMaterial?.diffuse.contents =
-            UIColor.darkGray
-
-        barrelGeometry.firstMaterial?.emission.contents =
-            UIColor.black
-
-        barrelGeometry.firstMaterial?.metalness.contents =
-            NSNumber(value: 0.75)
-
-        barrelGeometry.firstMaterial?.roughness.contents =
-            NSNumber(value: 0.30)
-
-        cannonBarrel.geometry =
-            barrelGeometry
-
-        // IMPORTANT:
-        //
-        // No geometry pivot translation.
-        // The barrel geometry remains centered
-        // on cannonBarrel's own origin.
-
-        cannonBarrel.pivot =
-            SCNMatrix4Identity
-
-        // SCNCylinder's long axis is local +Y.
-        //
-        // Rotate +Y into camera-local -Z.
-
-        cannonBarrel.eulerAngles =
-            SCNVector3(
-                -Float.pi / 2.0,
-                0,
-                0
-            )
-
-        // The cylinder is centered on its origin.
-        //
-        // Move its center forward by half its length.
-        //
-        // This places the rear endpoint exactly
-        // at cannonBarrelPivot.
-
-        cannonBarrel.position =
-            SCNVector3(
-                0,
-                0,
-                -halfLength
-            )
-
-        cannonBarrelPivot.addChildNode(
-            cannonBarrel
+        let barrelGeometry = SCNCylinder(
+            radius: 0.055,
+            height: CGFloat(barrelLength)
         )
 
-        // ========================================================
+        barrelGeometry.firstMaterial?.diffuse.contents = UIColor.darkGray
+        barrelGeometry.firstMaterial?.emission.contents = UIColor.black
+        barrelGeometry.firstMaterial?.metalness.contents = NSNumber(value: 0.75)
+        barrelGeometry.firstMaterial?.roughness.contents = NSNumber(value: 0.30)
+
+        cannonBarrel.geometry = barrelGeometry
+
+        // Critical: remove any pivot transform you may have assigned
+        // while experimenting with SCNMatrix4MakeTranslation.
+        cannonBarrel.pivot = SCNMatrix4Identity
+
+        // SCNCylinder length runs along local Y.
+        // Rotate its +Y direction to camera-local forward (-Z).
+        cannonBarrel.eulerAngles = SCNVector3(
+            -Float.pi / 2.0,
+            0,
+            0
+        )
+
+        // Geometry is centered on cannonBarrel's local origin.
+        //
+        // Its center sits half the barrel length forward of the parent hinge.
+        // Therefore its rear endpoint is exactly at cannonBarrelPivot origin.
+        cannonBarrel.position = SCNVector3(
+            0,
+            0,
+            -halfLength
+        )
+
+        cannonBarrelPivot.addChildNode(cannonBarrel)
+
+        // ============================================================
         // MUZZLE
-        // ========================================================
+        // ============================================================
 
-        // The muzzle is placed at the forward
-        // (+Y) end of the cylinder BEFORE the
-        // cylinder's geometry alignment rotation.
-
-        muzzleNode.position =
-            SCNVector3(
-                0,
-                halfLength,
-                0
-            )
-
-        cannonBarrel.addChildNode(
-            muzzleNode
+        // Muzzle is at the forward (+Y) end in the cylinder's
+        // unrotated local coordinate system.
+        muzzleNode.position = SCNVector3(
+            0,
+            halfLength,
+            0
         )
+
+        cannonBarrel.addChildNode(muzzleNode)
     }
 
     // ============================================================

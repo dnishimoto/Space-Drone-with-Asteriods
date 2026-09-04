@@ -290,7 +290,7 @@ final class GameState: ObservableObject {
                 origin: muzzle,
                 direction: direction,
                 stepSize: 0.1,
-                isPlayerLaser: true
+                isPlayerLaser: true,
             )
         )
     }
