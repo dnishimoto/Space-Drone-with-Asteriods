@@ -66,6 +66,7 @@ struct Laser {
         self.origin = origin
 
         self.direction = Laser.normalizedDirection(direction)
+        
 
         self.stepSize = max(
             stepSize,
@@ -94,7 +95,112 @@ struct Laser {
             rotated
         )
     }
+    func makeLaserNode(
+        color: UIColor
+    ) -> SCNNode {
 
+        // ============================================================
+        // LASER GEOMETRY
+        //
+        // SCNCylinder is aligned along local +Y / -Y by default.
+        // Rotate it so its length points along local -Z, which is the
+        // front axis used by container.look(... localFront: -Z).
+        // ============================================================
+
+        let geometry = SCNCylinder(
+            radius: 0.05,
+            height: 0.75
+        )
+
+        geometry.firstMaterial?.diffuse.contents = color
+        geometry.firstMaterial?.emission.contents = color
+        geometry.firstMaterial?.isDoubleSided = true
+
+        let beamNode = SCNNode(
+            geometry: geometry
+        )
+
+        beamNode.eulerAngles.x = Float(elevationAngle)
+        beamNode.eulerAngles.y = Float(lateralAngle)
+
+        // The container owns the world-space aim orientation.
+        let container = SCNNode()
+
+        container.addChildNode(
+           beamNode
+        )
+
+        // ============================================================
+        // POSITION
+        // ============================================================
+
+        let start = worldPosition()
+
+        // This assumes the caller adds `container` directly to the
+        // scene root (or another node with no rotation/translation).
+        //
+        // If you parent this under a transformed laserContainer, use:
+        //
+        // container.position = laserContainer.convertPosition(
+        //     start,
+        //     from: nil
+        // )
+        //
+        // before calling look(at:).
+        container.position = start
+
+        // ============================================================
+        // VISUAL YAW AND PITCH
+        //
+        // Start from the laser's actual normalized travel direction,
+        // then rotate a COPY for rendering only.
+        //
+        // Do not assign the result back to self.direction.
+        // ============================================================
+
+        var visualDirection = Laser.normalizedDirection(
+            direction
+        )
+
+        // Left/right aiming rotation.
+        visualDirection = Laser.rotatedByYaw(
+           visualDirection,
+            yawRadians: Float(lateralAngle)
+        )
+
+        // Up/down aiming rotation.
+        visualDirection = Laser.rotatedByPitch(
+            visualDirection,
+            pitchRadians: Float(elevationAngle) + Float.pi / 2.0
+        )
+ 
+
+        // ============================================================
+        // POINT THE LASER AT ITS VISUAL END POINT
+        // ============================================================
+
+        let worldEnd = SCNVector3(
+            start.x + visualDirection.x,
+            start.y + visualDirection.y,
+            start.z + visualDirection.z
+        )
+
+        container.look(
+            at: worldEnd,
+            up: SCNVector3(
+                0,
+                1,
+                0
+            ),
+            localFront: SCNVector3(
+                0,
+                0,
+                -1
+            )
+        )
+
+        return container
+    }
     // ============================================================
     // DIRECTION ROTATION
     // ============================================================

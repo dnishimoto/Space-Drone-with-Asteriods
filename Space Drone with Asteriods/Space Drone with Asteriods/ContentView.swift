@@ -438,17 +438,42 @@ struct RadarMapView: View {
 // MARK: - Joystick
 // ============================================================
 
+// ============================================================
+// MARK: - Joystick
+// ============================================================
+
 struct JoystickView: View {
+
+    enum Mode {
+        case movement
+        case aimAndFire
+    }
 
     var diameter: CGFloat = 120
     var knobDiameter: CGFloat = 56
     var baseColor: Color = .white
 
-    var onChange: (CGVector) -> Void
-    var onEnd: () -> Void
+    /// Used only by the red aim/fire joystick.
+    var game: GameState?
+
+    /// Blue joystick behavior remains callback based.
+    var onChange: ((CGVector) -> Void)? = nil
+    var onEnd: (() -> Void)? = nil
+
+    var mode: Mode = .movement
 
     @State private var knobOffset: CGSize = .zero
     @State private var active = false
+
+    // ============================================================
+    // AIM LIMITS
+    // ============================================================
+
+    /// ±60° left/right, expressed in radians.
+    private let maxAzimuth: Double = .pi / 3.0
+
+    /// ±30° up/down, expressed in radians.
+    private let maxElevation: Double = .pi / 6.0
 
     var body: some View {
 
@@ -487,56 +512,58 @@ struct JoystickView: View {
         }
         .contentShape(Circle())
         .gesture(
-
             DragGesture(
                 minimumDistance: 0
             )
-
             .onChanged { value in
 
                 active = true
 
-                let maxDistance =
-                    (diameter - knobDiameter) / 2
+                let maximumKnobOffset = max(
+                    (diameter - knobDiameter) / 2.0,
+                    1.0
+                )
 
-                var dx =
-                    value.translation.width
+                var dx = value.translation.width
+                var dy = value.translation.height
 
-                var dy =
-                    value.translation.height
+                let dragDistance = hypot(
+                    dx,
+                    dy
+                )
 
-                let distance =
-                    sqrt(
-                        dx * dx +
-                        dy * dy
-                    )
+                if dragDistance > maximumKnobOffset {
 
-                if distance > maxDistance,
-                   distance > 0 {
+                    let scale =
+                        maximumKnobOffset /
+                        dragDistance
 
-                    dx =
-                        dx / distance *
-                        maxDistance
-
-                    dy =
-                        dy / distance *
-                        maxDistance
+                    dx *= scale
+                    dy *= scale
                 }
 
-                knobOffset =
-                    CGSize(
-                        width: dx,
-                        height: dy
-                    )
-
-                onChange(
-                    CGVector(
-                        dx: dx / maxDistance,
-                        dy: dy / maxDistance
-                    )
+                knobOffset = CGSize(
+                    width: dx,
+                    height: dy
                 )
-            }
 
+                // Guaranteed to remain within -1...+1.
+                let vector = CGVector(
+                    dx: dx / maximumKnobOffset,
+                    dy: dy / maximumKnobOffset
+                )
+
+                switch mode {
+
+                case .movement:
+                    onChange?(vector)
+
+                case .aimAndFire:
+                    updateAimAndFire(
+                        with: vector
+                    )
+                }
+            }
             .onEnded { _ in
 
                 active = false
@@ -550,14 +577,67 @@ struct JoystickView: View {
                     knobOffset = .zero
                 }
 
-                onChange(.zero)
+                switch mode {
 
-                onEnd()
+                case .movement:
+                    onChange?(.zero)
+                    onEnd?()
+
+                case .aimAndFire:
+                    resetAimAndStopFiring()
+                }
             }
         )
     }
-}
 
+    // ============================================================
+    // MARK: - Aim / Fire
+    // ============================================================
+
+    private func updateAimAndFire(
+        with vector: CGVector
+    ) {
+
+        guard let game else {
+            return
+        }
+
+        // vector.dx is already normalized:
+        //
+        // -1.0 = left
+        //  0.0 = center
+        // +1.0 = right
+        //
+        // This result is in radians.
+        game.cannonAzimuth =
+            Double(vector.dx) *
+            maxAzimuth
+
+        // SwiftUI screen coordinates increase downward.
+        //
+        // vector.dy = -1.0 means joystick up,
+        // so negate it to make cannon elevation positive/upward.
+        //
+        // This result is in radians.
+        game.cannonElevation =
+            -Double(vector.dy) *
+            maxElevation
+
+        game.startFiring()
+    }
+
+    private func resetAimAndStopFiring() {
+
+        guard let game else {
+            return
+        }
+
+        game.cannonAzimuth = 0.0
+        game.cannonElevation = 0.0
+
+        game.stopFiring()
+    }
+}
 
 // ============================================================
 // MARK: - Volume View
@@ -616,6 +696,20 @@ struct ContentView: View {
     var body: some View {
 
         GeometryReader { geo in
+            
+            let screenWidth = max(Double(geo.size.width), 1.0)
+             let screenHeight = max(Double(geo.size.height), 1.0)
+
+             // Maximum cannon rotation from center.
+             let maxAzimuth: Double = .pi / 3.0      // ±60° left/right
+             let maxElevation: Double = .pi / 6.0    // ±30° up/down
+
+             // A full-width drag reaches the azimuth limit.
+             let azimuthSensitivity: Double = 1.0
+
+             // A full-height drag reaches the elevation limit.
+             let elevationSensitivity: Double = 1.0
+
 
             ZStack {
 
@@ -937,19 +1031,16 @@ struct ContentView: View {
                                 baseColor: .red,
 
                                 onChange: { v in
-
+                                    
+                                    let maxAzimuth: Double = .pi / 3.0
+                                    let maxElevation: Double = .pi / 6.0
+                                    
                                     game.cannonAzimuth =
-                                        Double(v.dx) * 0.8
-
+                                    Double(v.dx) * maxAzimuth
+                                    
                                     game.cannonElevation =
-                                        max(
-                                            -0.7,
-                                            min(
-                                                0.7,
-                                                Double(-v.dy) * 0.7
-                                            )
-                                        )
-
+                                    -Double(v.dy) * maxElevation
+                                    
                                     game.startFiring()
                                 },
 

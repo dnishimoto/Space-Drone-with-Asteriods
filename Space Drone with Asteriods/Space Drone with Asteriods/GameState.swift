@@ -259,14 +259,18 @@ final class GameState: ObservableObject {
 
         let muzzle =
             cannonMuzzleWorldPosition
+        
+        let azimuthRadians =
+         Float(cannonAzimuth) * Float.pi / 180.0
 
         let direction =
-            cannonWorldDirection.normalized
+        Laser.rotatedByYaw(cannonWorldDirection.normalized, yawRadians: azimuthRadians)
         
+        print(azimuthRadians)
 
-        guard direction.length > 0.000001 else {
-            return
-        }
+        //guard direction.length > 0.000001 else {
+        //    return
+        //}
 
         let radial = hypot(
             CGFloat(muzzle.x),
@@ -403,8 +407,26 @@ final class GameState: ObservableObject {
 
         playerLasers.removeAll()
         enemyLasers.removeAll()
+        
+        asteroids.removeAll()
+        sharks.removeAll()
 
+  
         pendingExplosions.removeAll()
+        
+        for (id, node) in asteroidNodes {
+                node.removeFromParentNode()
+        }
+        
+        for (id, node) in sharkNodes {
+                node.removeFromParentNode()
+        }
+        for (id, node) in alienNodes {
+                node.removeFromParentNode()
+        }
+        for (id, node) in flockNodes {
+                node.removeFromParentNode()
+        }
 
         score = 0
 

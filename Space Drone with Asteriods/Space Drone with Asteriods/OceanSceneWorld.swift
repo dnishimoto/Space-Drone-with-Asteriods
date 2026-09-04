@@ -15,7 +15,7 @@ final class OceanSceneWorld {
     let scene = SCNScene()
     let camera = SCNNode()
     private let cloudCeilingY: Float = 8.0
-    private let oceanSurfaceY: Float = -6.0
+    private let oceanSurfaceY: Float = 1.0
     private var lastSyncTime: TimeInterval = CACurrentMediaTime()
 
     // Camera/HUD-mounted cannon.
@@ -66,7 +66,7 @@ final class OceanSceneWorld {
             // preserved every frame via coordinate conversion in
             // makeLaserNode(), so shots still travel correctly through
             // world space even as the cannon aims.
-            cannonBarrel.addChildNode(laserContainer)
+            scene.rootNode.addChildNode(laserContainer)
             scene.rootNode.addChildNode(sharkContainer) // added shark container to scene
         }
 
@@ -850,8 +850,7 @@ final class OceanSceneWorld {
                 in gameState.playerLasers {
 
             laserContainer.addChildNode(
-                makeLaserNode(
-                    laser,
+                laser.makeLaserNode(
                     color: .green
                 )
             )
@@ -865,8 +864,7 @@ final class OceanSceneWorld {
         in gameState.enemyLasers {
 
             laserContainer.addChildNode(
-                makeLaserNode(
-                    laser,
+                laser.makeLaserNode(
                     color: .red
                 )
             )
@@ -1047,82 +1045,7 @@ final class OceanSceneWorld {
 
         return node
     }
-    private func makeLaserNode(
-        _ laser: Laser,
-        color: UIColor
-    ) -> SCNNode {
-
-        let geo = SCNCylinder(
-            radius: 0.05,
-            height: 0.75
-        )
-
-        geo.firstMaterial?.diffuse.contents = color
-        geo.firstMaterial?.emission.contents = color
-
-        let laserNode = SCNNode(geometry: geo)
-
-        // SCNCylinder's long axis is +Y.
-        //
-        // Rotate the cylinder so its long axis follows -Z.
-        laserNode.eulerAngles.x = -.pi / 2.0
-
-        let container = SCNNode()
-        container.addChildNode(laserNode)
-
-        // --------------------------------------------------
-        // Parent to laserContainer BEFORE computing position/
-        // orientation. laserContainer is nested under the cannon
-        // barrel now, so its own transform moves as the cannon
-        // aims — parenting first lets SceneKit resolve the
-        // world-space math below against the correct (current)
-        // parent chain.
-        // --------------------------------------------------
-
-        laserContainer.addChildNode(container)
-
-        // Laser starting position, in world space.
-        let worldPosition = laser.worldPosition()
-
-        // Convert into laserContainer's local space so the laser
-        // still renders at its true world position even though
-        // its parent (the cannon) may be aiming somewhere else.
-        container.position =
-            laserContainer.convertPosition(
-                worldPosition,
-                from: nil
-            )
-
-        // --------------------------------------------------
-        // Laser movement direction.
-        // --------------------------------------------------
-
-        let direction = laser.direction.normalized
-
-        guard direction.length > 0.000001 else {
-            return container
-        }
-
-        // Point the container in exactly the same direction
-        // that the Laser uses for movement. look(at:) resolves
-        // its target in world space regardless of the node's
-        // parent, so passing the true world-space end point here
-        // is correct even though container's position is stored
-        // in laserContainer-local coordinates.
-        let worldEnd = SCNVector3(
-            worldPosition.x + direction.x,
-            worldPosition.y + direction.y,
-            worldPosition.z + direction.z
-        )
-
-        container.look(
-            at: worldEnd,
-            up: SCNVector3(0, 1, 0),
-            localFront: SCNVector3(0, 0, -1)
-        )
-
-        return container
-    }
+  
 }
 private func rotationFromYAxis(to direction: SCNVector3) -> SCNQuaternion {
 

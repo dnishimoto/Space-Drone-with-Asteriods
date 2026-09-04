@@ -41,7 +41,7 @@ final class SharkManager {
 
     // MARK: - Ocean Bounds
 
-    private let minimumOceanY: CGFloat = 1.5
+    private let minimumOceanY: CGFloat = -1.5
     private let maximumOceanY: CGFloat = 8.0
 
     private let minimumOceanX: CGFloat = -7.0
