@@ -205,8 +205,8 @@ enum OceanGameState {
                 laser.worldPosition()
 
             for alien in
-                game.swarmManager.squids
-                where !alien.destroyed {
+                    game.swarmManager.squids
+            where !alien.destroyed {
 
                 let position =
                     alien.position
@@ -241,8 +241,8 @@ enum OceanGameState {
                 laser.worldPosition()
 
             for alien in
-                game.flockManager.aliens
-                where !alien.destroyed {
+                    game.flockManager.aliens
+            where !alien.destroyed {
 
                 let position =
                     alien.position
@@ -268,8 +268,7 @@ enum OceanGameState {
 
 
         // ============================================================
-        // IMPORTANT:
-        // FROM THIS POINT ON, COLLISIONS ARE FOR THE OCEAN WORLD.
+        // OCEAN WORLD COLLISIONS
         //
         // Ocean objects use their actual 3D position.
         //
@@ -296,8 +295,8 @@ enum OceanGameState {
         // ============================================================
 
         for alien in
-            game.swarmManager.squids
-            where !alien.destroyed {
+                game.swarmManager.squids
+        where !alien.destroyed {
 
             let alienPosition =
                 alien.position
@@ -322,9 +321,19 @@ enum OceanGameState {
                 // NO SHIELD = GAME OVER
                 // ----------------------------------------------------
 
-                game.gameOver = true
+                print(
+                    "GAME OVER: SQUID hit spaceship"
+                )
 
-                game.stopFiring()
+                print(
+                    "  Ship position: \(shipPosition)"
+                )
+
+                print(
+                    "  Squid position: \(alienPosition)"
+                )
+                
+                game.score -= 5
 
                 return
             }
@@ -336,8 +345,8 @@ enum OceanGameState {
         // ============================================================
 
         for alien in
-            game.flockManager.aliens
-            where !alien.destroyed {
+                game.flockManager.aliens
+        where !alien.destroyed {
 
             let alienPosition =
                 alien.position
@@ -362,9 +371,19 @@ enum OceanGameState {
                 // NO SHIELD = GAME OVER
                 // ----------------------------------------------------
 
-                game.gameOver = true
+                print(
+                    "GAME OVER: FISH hit spaceship"
+                )
 
-                game.stopFiring()
+                print(
+                    "  Ship position: \(shipPosition)"
+                )
+
+                print(
+                    "  Fish position: \(alienPosition)"
+                )
+
+                game.score -= 5
 
                 return
             }
@@ -375,12 +394,13 @@ enum OceanGameState {
         // SHIP → SHARK
         //
         // Sharks are major ocean enemies.
+        //
         // A shark collision causes immediate Game Over unless
         // the shield is active.
         // ============================================================
 
         for shark in game.sharks
-            where !shark.destroyed {
+        where !shark.destroyed {
 
             let sharkPosition =
                 shark.position
@@ -388,7 +408,7 @@ enum OceanGameState {
             if distance(
                 shipPosition,
                 sharkPosition
-            ) <= 1.8 {
+            ) <= 0.1 {
 
                 // ----------------------------------------------------
                 // SHIELD
@@ -402,8 +422,20 @@ enum OceanGameState {
                 }
 
                 // ----------------------------------------------------
-                // SHARK HIT
+                // SHARK HIT = GAME OVER
                 // ----------------------------------------------------
+
+                print(
+                    "GAME OVER: SHARK hit spaceship"
+                )
+
+                print(
+                    "  Ship position: \(shipPosition)"
+                )
+
+                print(
+                    "  Shark position: \(sharkPosition)"
+                )
 
                 game.gameOver = true
 
@@ -413,9 +445,18 @@ enum OceanGameState {
             }
         }
 
+
+        // ============================================================
+        // PLAYER LASERS → ASTEROIDS
+        // ============================================================
+
         let laserList =
             game.playerLasers
-        
+
+        var asteroidsToRemove:
+            [Asteroid] = []
+
+
         for laser in laserList {
 
             let laserPosition =
@@ -426,7 +467,8 @@ enum OceanGameState {
                 let asteroidPosition =
                     asteroid.tunnelPosition
 
-                let collisionRadius: CGFloat
+                let collisionRadius:
+                    CGFloat
 
                 switch asteroid.size {
 
@@ -434,62 +476,227 @@ enum OceanGameState {
                     collisionRadius = 1.1
 
                 case .medium:
-                    collisionRadius = 1.5
+                    collisionRadius = 2.5
 
                 case .large:
-                    collisionRadius = 2.1
+                    collisionRadius = 3.1
                 }
 
-                let distance =
+
+                let collisionDistance =
                     vectorDistance(
                         laserPosition,
                         asteroidPosition
                     )
 
-                if distance <= collisionRadius {
-                    
+
+                if collisionDistance <=
+                    collisionRadius {
 
                     game.score +=
                         asteroid.size.score
 
+
                     game.spawnExplosion(
-                        x:
-                            CGFloat(
-                                asteroidPosition.x
-                            ),
-                        y:
-                            CGFloat(
-                                asteroidPosition.y
-                            ),
-                        z:
-                            CGFloat(
-                                asteroidPosition.z
-                            ),
+                        x: CGFloat(
+                            asteroidPosition.x
+                        ),
+                        y: CGFloat(
+                            asteroidPosition.y
+                        ),
+                        z: CGFloat(
+                            asteroidPosition.z
+                        ),
                         scale:
                             asteroid.size == .large
                             ? 1.6
                             : 1.0
                     )
 
-                    // Mark for removal by removing the
-                    // asteroid from GameState.
 
-                    if let index =
-                        game.asteroids.firstIndex(
-                            where: {
-                                $0 === asteroid
-                            }
-                        ) {
-
-                        game.asteroids.remove(
-                            at: index
-                        )
-                    }
+                    asteroidsToRemove.append(
+                        asteroid
+                    )
 
                     break
                 }
             }
         }
+
+
+        // ============================================================
+        // ASTEROIDS → SPACESHIP
+        // ============================================================
+
+        let spaceshipPosition =
+            game.spaceShip.position
+
+
+        for asteroid in game.asteroids {
+
+            // --------------------------------------------------------
+            // Don't test an asteroid already destroyed by a laser.
+            // --------------------------------------------------------
+
+            if asteroidsToRemove.contains(
+                where: { $0 === asteroid }
+            ) {
+                continue
+            }
+
+
+            let asteroidPosition =
+                asteroid.tunnelPosition
+
+
+            let spaceshipCollisionRadius:
+                CGFloat
+
+
+            switch asteroid.size {
+
+            case .small:
+                spaceshipCollisionRadius = 0.1
+
+            case .medium:
+                spaceshipCollisionRadius = 0.4
+
+            case .large:
+                spaceshipCollisionRadius = 0.6
+            }
+
+
+            let collisionDistance =
+                vectorDistance(
+                    spaceshipPosition,
+                    asteroidPosition
+                )
+
+
+            if collisionDistance <=
+                spaceshipCollisionRadius {
+
+                // ----------------------------------------------------
+                // ASTEROID HIT = GAME OVER
+                // ----------------------------------------------------
+
+                print(
+                    "GAME OVER: \(asteroid.size) ASTEROID hit spaceship"
+                )
+
+                print(
+                    "  Ship position: \(spaceshipPosition)"
+                )
+
+                print(
+                    "  Asteroid position: \(asteroidPosition)"
+                )
+
+                print(
+                    "  Collision distance: \(collisionDistance)"
+                )
+
+                print(
+                    "  Collision radius: \(spaceshipCollisionRadius)"
+                )
+
+
+                game.spawnExplosion(
+                    x: CGFloat(
+                        spaceshipPosition.x
+                    ),
+                    y: CGFloat(
+                        spaceshipPosition.y
+                    ),
+                    z: CGFloat(
+                        spaceshipPosition.z
+                    ),
+                    scale: 1.8
+                )
+
+
+                game.gameOver = true
+
+                game.stopFiring()
+
+
+                asteroidsToRemove.append(
+                    asteroid
+                )
+
+
+                return
+            }
+        }
+
+
+        // ============================================================
+        // REMOVE DESTROYED / COLLIDED ASTEROIDS
+        // ============================================================
+
+        for asteroid in asteroidsToRemove {
+
+            game.asteroids.removeAll {
+                $0 === asteroid
+            }
+        }
+        
+        // --------------------------------------------------------
+        // PLAYER LASERS → SHARKS
+        // --------------------------------------------------------
+
+        var sharksToRemove: [Shark] = []
+
+        for laser in game.playerLasers {
+
+            let laserPosition = laser.worldPosition()
+
+            for shark in game.sharks {
+
+                // Do not hit an already destroyed shark.
+                if shark.destroyed {
+                    continue
+                }
+
+                // Shark position is already its ocean world position.
+                let sharkPosition = shark.position
+
+                // Collision radius for the shark.
+                let collisionRadius: CGFloat = 0.5
+
+                let collisionDistance = vectorDistance(
+                    laserPosition,
+                    sharkPosition
+                )
+
+                if collisionDistance <= collisionRadius {
+
+                    print("LASER HIT SHARK")
+                    print("  Laser position: \(laserPosition)")
+                    print("  Shark position: \(sharkPosition)")
+                    print("  Collision distance: \(collisionDistance)")
+                    print("  Collision radius: \(collisionRadius)")
+
+                    // Destroy the shark.
+                    shark.destroyed = true
+
+                    // Score for destroying shark.
+                    game.score += 100
+
+
+                    sharksToRemove.append(shark)
+
+                    // This laser has hit something.
+                    break
+                }
+            }
+        }
+
+        // Remove destroyed sharks after collision processing.
+        for shark in sharksToRemove {
+            game.sharks.removeAll { $0 === shark }
+        }
+        
     }
 
 

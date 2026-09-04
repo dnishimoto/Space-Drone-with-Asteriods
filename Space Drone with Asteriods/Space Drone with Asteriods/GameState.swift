@@ -55,8 +55,8 @@ final class GameState: ObservableObject {
     // GAME
     // ============================================================
 
-    @Published var score = 20_000
-    //@Published var score = 0
+    //@Published var score = 20_000
+    @Published var score = 0
 
     @Published var gameOver = false
 
@@ -423,6 +423,8 @@ final class GameState: ObservableObject {
         frameTick = 0
         
         currentSection = .tunnel
+        
+        //currentSection = .ocean
 
         start()
     }

@@ -421,7 +421,12 @@ enum TunnelGameState {
 
         let laserList =
             game.playerLasers
+        
+        let shipPosition =
+            game.spaceShip.position
 
+
+        
         // --------------------------------------------------------
         // PLAYER LASERS → ASTEROIDS
         // --------------------------------------------------------
@@ -713,31 +718,118 @@ enum TunnelGameState {
         // SHIP → SHARK
         // --------------------------------------------------------
 
-        for shark in game.sharks
-        where !shark.destroyed {
+        // ============================================================
+            // SHIP → SHARK
+            //
+            // Sharks are major ocean enemies.
+            //
+            // A shark collision causes immediate Game Over unless
+            // the shield is active.
+            // ============================================================
+        let spaceshipPosition =
+            game.spaceShip.position
+            for shark in game.sharks
+            where !shark.destroyed {
 
-            if hitsShip(
-                angle:
-                    shark.lateralAngle,
-                z:
-                    shark.z,
-                shipAngle:
-                    shipAngle
-            ) {
+                let sharkPosition =
+                    shark.position
+                
 
-                if game.shieldActive {
+                if distance(
+                    shipPosition,
+                    sharkPosition
+                ) <= 0.1 {
 
-                    shark.destroyed = true
+                    // ----------------------------------------------------
+                    // SHIELD
+                    // ----------------------------------------------------
 
-                    continue
+                    if game.shieldActive {
+
+                        shark.destroyed = true
+
+                        continue
+                    }
+
+                    // ----------------------------------------------------
+                    // SHARK HIT = GAME OVER
+                    // ----------------------------------------------------
+
+                    print(
+                        "GAME OVER: SHARK hit spaceship"
+                    )
+
+                    print(
+                        "  Ship position: \(shipPosition)"
+                    )
+
+                    print(
+                        "  Shark position: \(sharkPosition)"
+                    )
+
+                    game.gameOver = true
+
+                    game.stopFiring()
+
+                    return
                 }
-
-                // Shark is a major Ocean opponent.
-                game.gameOver = true
-
-                game.stopFiring()
             }
-        }
+
+       // PLAYER LASERS → SHARKS
+            // --------------------------------------------------------
+
+            var sharksToRemove: [Shark] = []
+
+            for laser in game.playerLasers {
+
+                let laserPosition = laser.worldPosition()
+
+                for shark in game.sharks {
+
+                    // Do not hit an already destroyed shark.
+                    if shark.destroyed {
+                        continue
+                    }
+
+                    // Shark position is already its ocean world position.
+                    let sharkPosition = shark.position
+
+                    // Collision radius for the shark.
+                    let collisionRadius: CGFloat = 0.5
+
+                    let collisionDistance = vectorDistance(
+                        laserPosition,
+                        sharkPosition
+                    )
+
+                    if collisionDistance <= collisionRadius {
+
+                        print("LASER HIT SHARK")
+                        print("  Laser position: \(laserPosition)")
+                        print("  Shark position: \(sharkPosition)")
+                        print("  Collision distance: \(collisionDistance)")
+                        print("  Collision radius: \(collisionRadius)")
+
+                        // Destroy the shark.
+                        shark.destroyed = true
+
+                        // Score for destroying shark.
+                        game.score += 100
+
+
+                        sharksToRemove.append(shark)
+
+                        // This laser has hit something.
+                        break
+                    }
+                }
+            }
+
+            // Remove destroyed sharks after collision processing.
+            for shark in sharksToRemove {
+                game.sharks.removeAll { $0 === shark }
+            }
+
 
         // --------------------------------------------------------
         // ENEMY LASERS → PLAYER

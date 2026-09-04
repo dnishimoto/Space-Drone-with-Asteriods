@@ -43,25 +43,27 @@ extension CreatureMesh {
 
         body.firstMaterial?.diffuse.contents =
             UIColor(
-                red: 0.08,
-                green: 0.14,
-                blue: 0.30,
+                red: 1.0,
+                green: 0.30,
+                blue: 0.02,
                 alpha: 1.0
             )
 
         body.firstMaterial?.emission.contents =
             UIColor(
-                red: 0.05,
-                green: 0.12,
-                blue: 0.55,
+                red: 0.45,
+                green: 0.06,
+                blue: 0.0,
                 alpha: 1.0
             )
 
         body.firstMaterial?.roughness.contents = 0.28
 
-        let bodyNode = SCNNode(geometry: body)
+        let bodyNode =
+            SCNNode(geometry: body)
 
-        bodyNode.eulerAngles.x = .pi / 2
+        bodyNode.eulerAngles.x =
+            .pi / 2
 
         root.addChildNode(bodyNode)
 
@@ -70,66 +72,78 @@ extension CreatureMesh {
         // ALIEN HEAD / SNOUT
         // ============================================================
 
-        let head = SCNSphere(radius: 0.20)
+        let head =
+            SCNSphere(radius: 0.20)
 
         head.firstMaterial?.diffuse.contents =
             UIColor(
-                red: 0.10,
-                green: 0.18,
-                blue: 0.38,
+                red: 1.0,
+                green: 0.42,
+                blue: 0.02,
                 alpha: 1.0
             )
 
         head.firstMaterial?.emission.contents =
             UIColor(
-                red: 0.08,
-                green: 0.16,
-                blue: 0.65,
+                red: 0.55,
+                green: 0.10,
+                blue: 0.0,
                 alpha: 1.0
             )
 
-        let headNode = SCNNode(geometry: head)
+        let headNode =
+            SCNNode(geometry: head)
 
         headNode.position =
-            SCNVector3(0, 0, 0.48)
+            SCNVector3(
+                0,
+                0,
+                0.48
+            )
 
         headNode.scale =
-            SCNVector3(0.90, 0.82, 1.35)
+            SCNVector3(
+                0.90,
+                0.82,
+                1.35
+            )
 
         root.addChildNode(headNode)
 
 
         // ============================================================
-        // GLOWING ALIEN EYES
+        // GLOWING YELLOW ALIEN EYES
         // ============================================================
 
-        let eyeMaterial = SCNMaterial()
+        let eyeMaterial =
+            SCNMaterial()
 
         eyeMaterial.diffuse.contents =
             UIColor(
-                red: 0.65,
-                green: 1.0,
-                blue: 0.95,
+                red: 1.0,
+                green: 0.90,
+                blue: 0.05,
                 alpha: 1.0
             )
 
         eyeMaterial.emission.contents =
             UIColor(
-                red: 0.15,
-                green: 1.0,
-                blue: 0.85,
+                red: 1.0,
+                green: 0.65,
+                blue: 0.0,
                 alpha: 1.0
             )
 
         for side: Float in [-1, 1] {
 
-            let eye = SCNSphere(radius: 0.055)
+            let eye =
+                SCNSphere(radius: 0.055)
 
-            eye.firstMaterial = eyeMaterial
+            eye.firstMaterial =
+                eyeMaterial
 
-            let eyeNode = SCNNode(
-                geometry: eye
-            )
+            let eyeNode =
+                SCNNode(geometry: eye)
 
             eyeNode.position =
                 SCNVector3(
@@ -143,39 +157,38 @@ extension CreatureMesh {
 
 
         // ============================================================
-        // SECONDARY EYES
-        //
-        // Gives the creature a distinctly alien appearance.
+        // SECONDARY YELLOW EYES
         // ============================================================
 
-        let secondaryEyeMaterial = SCNMaterial()
+        let secondaryEyeMaterial =
+            SCNMaterial()
 
         secondaryEyeMaterial.diffuse.contents =
             UIColor(
-                red: 0.45,
-                green: 0.95,
-                blue: 1.0,
+                red: 1.0,
+                green: 0.75,
+                blue: 0.05,
                 alpha: 1.0
             )
 
         secondaryEyeMaterial.emission.contents =
             UIColor(
-                red: 0.10,
-                green: 0.65,
-                blue: 1.0,
+                red: 1.0,
+                green: 0.45,
+                blue: 0.0,
                 alpha: 1.0
             )
 
         for side: Float in [-1, 1] {
 
-            let eye = SCNSphere(radius: 0.025)
+            let eye =
+                SCNSphere(radius: 0.025)
 
             eye.firstMaterial =
                 secondaryEyeMaterial
 
-            let eyeNode = SCNNode(
-                geometry: eye
-            )
+            let eyeNode =
+                SCNNode(geometry: eye)
 
             eyeNode.position =
                 SCNVector3(
@@ -189,39 +202,50 @@ extension CreatureMesh {
 
 
         // ============================================================
-        // DORSAL FIN
+        // YELLOW / ORANGE FIN MATERIAL
         // ============================================================
 
-        let dorsalMaterial = SCNMaterial()
+        let dorsalMaterial =
+            SCNMaterial()
 
         dorsalMaterial.diffuse.contents =
             UIColor(
-                red: 0.20,
-                green: 0.30,
-                blue: 0.75,
+                red: 1.0,
+                green: 0.68,
+                blue: 0.02,
                 alpha: 1.0
             )
 
         dorsalMaterial.emission.contents =
             UIColor(
-                red: 0.08,
-                green: 0.18,
-                blue: 0.65,
+                red: 0.75,
+                green: 0.25,
+                blue: 0.0,
                 alpha: 1.0
             )
 
-        let dorsalFin = SCNCone(
-            topRadius: 0.0,
-            bottomRadius: 0.11,
-            height: 0.30
-        )
+        dorsalMaterial.roughness.contents =
+            0.25
+
+
+        // ============================================================
+        // DORSAL FIN
+        // ============================================================
+
+        let dorsalFin =
+            SCNCone(
+                topRadius: 0.0,
+                bottomRadius: 0.11,
+                height: 0.30
+            )
 
         dorsalFin.firstMaterial =
             dorsalMaterial
 
-        let dorsalNode = SCNNode(
-            geometry: dorsalFin
-        )
+        let dorsalNode =
+            SCNNode(
+                geometry: dorsalFin
+            )
 
         dorsalNode.position =
             SCNVector3(
@@ -240,18 +264,20 @@ extension CreatureMesh {
         // LEFT PECTORAL FIN
         // ============================================================
 
-        let finLeft = SCNCone(
-            topRadius: 0.0,
-            bottomRadius: 0.065,
-            height: 0.34
-        )
+        let finLeft =
+            SCNCone(
+                topRadius: 0.0,
+                bottomRadius: 0.065,
+                height: 0.34
+            )
 
         finLeft.firstMaterial =
             dorsalMaterial
 
-        let finLeftNode = SCNNode(
-            geometry: finLeft
-        )
+        let finLeftNode =
+            SCNNode(
+                geometry: finLeft
+            )
 
         finLeftNode.position =
             SCNVector3(
@@ -270,18 +296,20 @@ extension CreatureMesh {
         // RIGHT PECTORAL FIN
         // ============================================================
 
-        let finRight = SCNCone(
-            topRadius: 0.0,
-            bottomRadius: 0.065,
-            height: 0.34
-        )
+        let finRight =
+            SCNCone(
+                topRadius: 0.0,
+                bottomRadius: 0.065,
+                height: 0.34
+            )
 
         finRight.firstMaterial =
             dorsalMaterial
 
-        let finRightNode = SCNNode(
-            geometry: finRight
-        )
+        let finRightNode =
+            SCNNode(
+                geometry: finRight
+            )
 
         finRightNode.position =
             SCNVector3(
@@ -300,17 +328,19 @@ extension CreatureMesh {
         // TAIL STEM
         // ============================================================
 
-        let tailStem = SCNCylinder(
-            radius: 0.075,
-            height: 0.24
-        )
+        let tailStem =
+            SCNCylinder(
+                radius: 0.075,
+                height: 0.24
+            )
 
         tailStem.firstMaterial =
             dorsalMaterial
 
-        let tailStemNode = SCNNode(
-            geometry: tailStem
-        )
+        let tailStemNode =
+            SCNNode(
+                geometry: tailStem
+            )
 
         tailStemNode.position =
             SCNVector3(
@@ -329,18 +359,20 @@ extension CreatureMesh {
         // UPPER TAIL
         // ============================================================
 
-        let upperTail = SCNCone(
-            topRadius: 0.0,
-            bottomRadius: 0.10,
-            height: 0.27
-        )
+        let upperTail =
+            SCNCone(
+                topRadius: 0.0,
+                bottomRadius: 0.10,
+                height: 0.27
+            )
 
         upperTail.firstMaterial =
             dorsalMaterial
 
-        let upperTailNode = SCNNode(
-            geometry: upperTail
-        )
+        let upperTailNode =
+            SCNNode(
+                geometry: upperTail
+            )
 
         upperTailNode.position =
             SCNVector3(
@@ -359,18 +391,20 @@ extension CreatureMesh {
         // LOWER TAIL
         // ============================================================
 
-        let lowerTail = SCNCone(
-            topRadius: 0.0,
-            bottomRadius: 0.085,
-            height: 0.23
-        )
+        let lowerTail =
+            SCNCone(
+                topRadius: 0.0,
+                bottomRadius: 0.085,
+                height: 0.23
+            )
 
         lowerTail.firstMaterial =
             dorsalMaterial
 
-        let lowerTailNode = SCNNode(
-            geometry: lowerTail
-        )
+        let lowerTailNode =
+            SCNNode(
+                geometry: lowerTail
+            )
 
         lowerTailNode.position =
             SCNVector3(
@@ -386,38 +420,41 @@ extension CreatureMesh {
 
 
         // ============================================================
-        // ALIEN GLOW STRIP
+        // ALIEN ORANGE/YELLOW GLOW STRIP
         // ============================================================
 
-        let glowMaterial = SCNMaterial()
+        let glowMaterial =
+            SCNMaterial()
 
         glowMaterial.diffuse.contents =
             UIColor(
-                red: 0.10,
-                green: 0.75,
-                blue: 1.0,
+                red: 1.0,
+                green: 0.85,
+                blue: 0.05,
                 alpha: 1.0
             )
 
         glowMaterial.emission.contents =
             UIColor(
-                red: 0.05,
-                green: 0.90,
-                blue: 1.0,
+                red: 1.0,
+                green: 0.45,
+                blue: 0.0,
                 alpha: 1.0
             )
 
-        let glow = SCNCylinder(
-            radius: 0.025,
-            height: 0.58
-        )
+        let glow =
+            SCNCylinder(
+                radius: 0.025,
+                height: 0.58
+            )
 
         glow.firstMaterial =
             glowMaterial
 
-        let glowNode = SCNNode(
-            geometry: glow
-        )
+        let glowNode =
+            SCNNode(
+                geometry: glow
+            )
 
         glowNode.position =
             SCNVector3(
@@ -432,8 +469,11 @@ extension CreatureMesh {
         root.addChildNode(glowNode)
 
 
+        // ============================================================
+        // RETURN SHARK
+        // ============================================================
+
         return root
     }
-
 }
 

@@ -23,7 +23,7 @@ final class AsteroidManager {
     // ========================================================
 
     private var oceanSpawnClock: CGFloat = 0
-    private let oceanSpawnInterval: CGFloat = 0.7
+    private let oceanSpawnInterval: CGFloat = 3.7
 
     // ========================================================
     // UPDATE
