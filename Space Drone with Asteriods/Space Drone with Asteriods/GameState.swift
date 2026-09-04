@@ -33,7 +33,7 @@ final class GameState: ObservableObject {
     var cannonMuzzleWorldPosition =
         SCNVector3(0, 0, 0)
 
-    @Published var cannonLateralAngle: Double = 0.0
+    //@Published var cannonLateralAngle: Double = 0.0
     @Published var cannonElevation: Double = 0.0
 
     var cannonAzimuth: Double = 0.0
@@ -55,8 +55,8 @@ final class GameState: ObservableObject {
     // GAME
     // ============================================================
 
-    @Published var score = 20_000
-    //@Published var score = 0
+    //@Published var score = 20_000
+    @Published var score = 0
 
     @Published var gameOver = false
 
@@ -252,25 +252,16 @@ final class GameState: ObservableObject {
     // ============================================================
 
     func shootLaser() {
-
         guard !gameOver else {
             return
         }
 
-        let muzzle =
-            cannonMuzzleWorldPosition
-        
-        let azimuthRadians =
-         Float(cannonAzimuth) * Float.pi / 180.0
+        let muzzle = cannonMuzzleWorldPosition
 
-        let direction =
-        Laser.rotatedByYaw(cannonWorldDirection.normalized, yawRadians: azimuthRadians)
-        
-        print(azimuthRadians)
-
-        //guard direction.length > 0.000001 else {
-        //    return
-        //}
+        let direction = Laser.makeCannonDirection(
+            yaw: cannonAzimuth,
+            pitch: cannonElevation
+        )
 
         let radial = hypot(
             CGFloat(muzzle.x),
@@ -294,7 +285,7 @@ final class GameState: ObservableObject {
                 origin: muzzle,
                 direction: direction,
                 stepSize: 0.1,
-                isPlayerLaser: true,
+                isPlayerLaser: true
             )
         )
     }

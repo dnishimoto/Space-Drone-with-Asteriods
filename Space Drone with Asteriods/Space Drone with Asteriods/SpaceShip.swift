@@ -38,9 +38,9 @@ struct SpaceShip {
         let lateralSpeed: CGFloat = 1.8
         let verticalSpeed: CGFloat = 6.0
 
-        // --------------------------------------------------------
-        // LEFT / RIGHT
-        // --------------------------------------------------------
+        // ============================================================
+        // LEFT / RIGHT AROUND THE TUNNEL
+        // ============================================================
 
         lateralAngle +=
             lateralInput *
@@ -54,70 +54,80 @@ struct SpaceShip {
             lateralAngle += 2.0 * Double.pi
         }
 
-        // --------------------------------------------------------
+        // ============================================================
         // UP / DOWN
-        // --------------------------------------------------------
+        // ============================================================
 
         verticalPosition +=
             verticalInput *
             verticalSpeed *
             dt
 
-        // --------------------------------------------------------
-        // TUNNEL WALL CONSTRAINT
-        // --------------------------------------------------------
+        // ============================================================
+        // TUNNEL BOUNDARY
+        //
+        // The ship must remain inside the cylindrical tunnel.
+        // ============================================================
 
         let shipClearance: CGFloat = 0.55
 
-        let tubeRadius =
-            Tunnel.radius - shipClearance
-
-        let x =
-            tubeRadius *
-            CGFloat(cos(lateralAngle)) *
-            radialOffset
-
-        let yLimit =
-            sqrt(
-                max(
-                    0,
-                    tubeRadius * tubeRadius - x * x
-                )
-            )*1.8
-
-        verticalPosition = max(
-            -yLimit,
-            min(
-                yLimit,
-                verticalPosition
+        let maximumRadius =
+            max(
+                0.0,
+                Tunnel.radius - shipClearance
             )
-        )
 
-        // --------------------------------------------------------
+        // X position is determined by the ship's position
+        // around the tunnel circumference.
+
+        let worldRadius =
+            maximumRadius * radialOffset
+
+        var worldX =
+            worldRadius *
+            CGFloat(cos(lateralAngle))
+
+        var worldY =
+            verticalPosition
+
+        // ============================================================
+        // HARD RADIAL CONSTRAINT
+        //
+        // sqrt(X² + Y²) must never exceed the tunnel radius.
+        // ============================================================
+
+        let distanceFromCenter =
+            hypot(worldX, worldY)
+
+        if distanceFromCenter > maximumRadius {
+
+            let scale =
+                maximumRadius /
+                max(distanceFromCenter, 0.000001)
+
+            worldX *= scale
+            worldY *= scale
+
+            // Keep the stored vertical position synchronized
+            // with the constrained world position.
+            verticalPosition = worldY
+        }
+
+        // ============================================================
         // FORWARD
-        // --------------------------------------------------------
+        // ============================================================
 
         z += forwardSpeed * dt
         progress += forwardSpeed * dt
 
-        // --------------------------------------------------------
+        // ============================================================
         // TUNNEL WORLD POSITION
-        // --------------------------------------------------------
-
-        let worldRadius =
-            Tunnel.radius * radialOffset
-
-        let worldX =
-            worldRadius *
-            CGFloat(cos(lateralAngle))
-
-        let worldY =
-            verticalPosition
+        // ============================================================
 
         position = SCNVector3(
             Float(worldX),
             Float(worldY),
-            Float(0.0)
+            0.0
         )
     }
 

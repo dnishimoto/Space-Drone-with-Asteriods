@@ -453,6 +453,7 @@ final class TunnelSceneWorld {
         cannonBarrel.addChildNode(muzzleNode)
     }
 
+
     // ============================================================
     // PLAYER SHIP
     // ============================================================
