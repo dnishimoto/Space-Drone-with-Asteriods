@@ -95,7 +95,7 @@ final class TunnelSceneWorld {
             flockContainer
         )
 
-        muzzleNode.addChildNode(
+        scene.rootNode.addChildNode(
             laserContainer
         )
         scene.rootNode.addChildNode(sharkContainer)

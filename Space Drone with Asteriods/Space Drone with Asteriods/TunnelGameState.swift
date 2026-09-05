@@ -108,8 +108,6 @@ enum TunnelGameState {
                         z:
                             enemy.z - 1.5,
 
-                        radialOffset:
-                            Tunnel.shipRadialInset,
 
                         origin:
                             origin,

@@ -16,7 +16,6 @@ struct Laser {
     // ============================================================
 
     var z: CGFloat
-    var radialOffset: CGFloat
 
     // ============================================================
     // TRAVEL
@@ -44,7 +43,6 @@ struct Laser {
         lateralAngle: Double,
         elevationAngle: Double,
         z: CGFloat,
-        radialOffset: CGFloat,
         origin: SCNVector3,
         direction: SCNVector3,
         stepSize: CGFloat,
@@ -55,7 +53,6 @@ struct Laser {
         self.elevationAngle = elevationAngle
 
         self.z = z
-        self.radialOffset = radialOffset
 
         self.stepSize = max(
             stepSize,

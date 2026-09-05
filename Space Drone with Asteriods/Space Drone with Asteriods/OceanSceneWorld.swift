@@ -60,7 +60,7 @@ final class OceanSceneWorld {
             scene.rootNode.addChildNode(asteroidContainer)
             scene.rootNode.addChildNode(alienContainer)
             scene.rootNode.addChildNode(flockContainer)
-            muzzleNode.addChildNode(laserContainer)
+            scene.rootNode.addChildNode(laserContainer)
             scene.rootNode.addChildNode(sharkContainer) // added shark container to scene
         }
 

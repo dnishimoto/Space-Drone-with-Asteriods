@@ -264,32 +264,36 @@ final class GameState: ObservableObject {
             return
         }
 
+        // ============================================================
+        // ROTATE, THEN TRANSLATE
+        //
+        // Direction: cannonWorldDirection is the cannon's local
+        // forward vector (0,0,-1) ROTATED into world space through
+        // the full node chain (ship -> camera -> cockpit -> barrel
+        // pivot -> barrel -> muzzle). It reflects the cannon's actual
+        // rendered aim, including any ship rotation/roll.
+        //
+        // Origin: cannonMuzzleWorldPosition is that same muzzle node
+        // TRANSLATED into world space.
+        //
+        // Previously this recomputed direction from raw
+        // cannonAzimuth/cannonElevation via Laser.makeCannonDirection,
+        // which assumes the cannon's parent frame IS the world frame.
+        // That ignores the ship's own orientation, so the fired laser
+        // direction could disagree with where the cannon is actually
+        // pointing on screen. Using the already-rotated world vector
+        // keeps the two in sync.
+        // ============================================================
+
         let muzzle = cannonMuzzleWorldPosition
 
-        let direction = Laser.makeCannonDirection(
-            yaw: cannonAzimuth,
-            pitch: cannonElevation
-        )
-
-        let radial = hypot(
-            CGFloat(muzzle.x),
-            CGFloat(muzzle.y)
-        )
-
-        let normalizedRadial = max(
-            Tunnel.minRadialOffset,
-            min(
-                0.98,
-                radial / Tunnel.radius
-            )
-        )
+        let direction = cannonWorldDirection
 
         playerLasers.append(
             Laser(
                 lateralAngle: cannonAzimuth,
                 elevationAngle: cannonElevation,
                 z: CGFloat(muzzle.z),
-                radialOffset: normalizedRadial,
                 origin: muzzle,
                 direction: direction,
                 stepSize: 0.1,
