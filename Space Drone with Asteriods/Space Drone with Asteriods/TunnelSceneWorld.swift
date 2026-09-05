@@ -36,6 +36,7 @@ final class TunnelSceneWorld {
     private let enemyRoot = SCNNode()
     private var tubeSegments: [SCNNode] = []
 
+
     // ============================================================
     // COCKPIT CANNON RIG
     // ============================================================
@@ -94,7 +95,7 @@ final class TunnelSceneWorld {
             flockContainer
         )
 
-        scene.rootNode.addChildNode(
+        muzzleNode.addChildNode(
             laserContainer
         )
         scene.rootNode.addChildNode(sharkContainer)
@@ -339,12 +340,7 @@ final class TunnelSceneWorld {
            camera.position = SCNVector3(0, 0.3, -2.8)
            camera.eulerAngles.y = .pi   // look down +Z
 
-           // The camera is a child of the ship root, so it automatically
-           // inherits the ship's world position/rotation every frame
-           // without needing to be manually re-synced in sync(). This
-           // position (0, 0.3, -2.8) is now a fixed LOCAL offset from
-           // the ship, not a world position.
-           shipRoot.addChildNode(camera)
+            shipRoot.addChildNode(camera)
 
            setupCockpitCannon()
        }
@@ -449,6 +445,7 @@ final class TunnelSceneWorld {
             halfLength,
             0
         )
+
 
         cannonBarrel.addChildNode(muzzleNode)
     }
@@ -730,11 +727,11 @@ final class TunnelSceneWorld {
         camera.eulerAngles.z =
             Float(ship.lateralInput) * 0.12
 
-        camera.position.x =
-            shipPosition.x * 0.6
-
-        camera.position.y =
-            shipPosition.y * 0.6 + 0.25
+        camera.position = SCNVector3(
+            0,
+            0.3,
+            -2.8
+        )
 
 
         // ============================================================
@@ -749,12 +746,10 @@ final class TunnelSceneWorld {
         let pitch =
             Float(gameState.cannonElevation)
 
-        cannonBarrelPivot.eulerAngles =
-            SCNVector3(
-                pitch,
-                -yaw,
-                0
-            )
+        cannonBarrelPivot.eulerAngles = SCNVector3(
+            pitch,
+            -yaw,
+            0)
 
         cannonNode.eulerAngles =
             SCNVector3(
@@ -1123,12 +1118,9 @@ final class TunnelSceneWorld {
         // ------------------------------------------------------------
 
         for laser in gameState.playerLasers {
-
-            laserContainer.addChildNode(
-                laser.makeLaserNode(
-                    color: .green
-                )
-            )
+            let node = laser.makeLaserNode(color: .green)
+            node.position = laser.position
+            laserContainer.addChildNode(node)
         }
 
 
@@ -1137,12 +1129,9 @@ final class TunnelSceneWorld {
         // ------------------------------------------------------------
 
         for laser in gameState.enemyLasers {
-
-            laserContainer.addChildNode(
-                laser.makeLaserNode(
-                    color: .red
-                )
-            )
+            let node = laser.makeLaserNode(color: .red)
+            node.position = laser.position
+            laserContainer.addChildNode(node)
         }
 
 

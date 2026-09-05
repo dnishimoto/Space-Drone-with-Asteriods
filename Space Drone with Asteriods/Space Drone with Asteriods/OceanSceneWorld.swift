@@ -19,7 +19,7 @@ final class OceanSceneWorld {
     private var lastSyncTime: TimeInterval = CACurrentMediaTime()
 
     // Camera/HUD-mounted cannon.
-    // This belongs ONLY to camera.
+    // This belongs ONLY to camera.la
     private let cockpitCannonNode = SCNNode()
 
     private let shipRoot = SCNNode()
@@ -60,13 +60,7 @@ final class OceanSceneWorld {
             scene.rootNode.addChildNode(asteroidContainer)
             scene.rootNode.addChildNode(alienContainer)
             scene.rootNode.addChildNode(flockContainer)
-            // laserContainer is a child of the cannon barrel (built inside
-            // setupCamera() -> setupCockpitCannon()), so fired lasers spawn
-            // relative to the gun. Per-laser world position is still
-            // preserved every frame via coordinate conversion in
-            // makeLaserNode(), so shots still travel correctly through
-            // world space even as the cannon aims.
-            scene.rootNode.addChildNode(laserContainer)
+            muzzleNode.addChildNode(laserContainer)
             scene.rootNode.addChildNode(sharkContainer) // added shark container to scene
         }
 
@@ -320,7 +314,7 @@ final class OceanSceneWorld {
             halfLength,
             0
         )
-
+        
         cannonBarrel.addChildNode(muzzleNode)
     }
 
@@ -846,28 +840,20 @@ final class OceanSceneWorld {
         // PLAYER LASERS
         // ========================================================
 
-        for laser
-                in gameState.playerLasers {
-
-            laserContainer.addChildNode(
-                laser.makeLaserNode(
-                    color: .green
-                )
-            )
+        for laser in gameState.playerLasers {
+            let node = laser.makeLaserNode(color: .green)
+            node.position = laser.position
+            laserContainer.addChildNode(node)
         }
 
         // ========================================================
         // ENEMY LASERS
         // ========================================================
 
-        for laser
-        in gameState.enemyLasers {
-
-            laserContainer.addChildNode(
-                laser.makeLaserNode(
-                    color: .red
-                )
-            )
+        for laser in gameState.enemyLasers {
+            let node = laser.makeLaserNode(color: .red)
+            node.position = laser.position
+            laserContainer.addChildNode(node)
         }
 
         processExplosions(

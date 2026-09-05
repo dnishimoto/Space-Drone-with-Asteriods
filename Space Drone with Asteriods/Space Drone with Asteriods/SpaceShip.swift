@@ -9,39 +9,95 @@ import Foundation
 import SceneKit
 
 struct SpaceShip {
+
+    // MARK: - Ocean Limits
+
     private let oceanMinimumX: CGFloat = -45.0
     private let oceanMaximumX: CGFloat = 45.0
+
     private let oceanSurfaceY: CGFloat = -16.0
     private let cloudCeilingY: CGFloat = 42.0
     private let oceanShipClearance: CGFloat = 1.5
-    
+
+    // MARK: - World Position
+
+    /// Actual world-space position of the ship.
+    ///
+    /// The ship moves in X/Y.
+    /// The ship does NOT rotate.
+    ///
+    /// Tunnel:
+    ///     X = lateral position
+    ///     Y = vertical position
+    ///     Z = 0
+    ///
+    /// Ocean:
+    ///     X = lateral position
+    ///     Y = vertical position
+    ///     Z = 0
     var position: SCNVector3 = SCNVector3(
         0,
         0,
         0
     )
+
+    // MARK: - Tunnel Position
+
+    /// Logical position around the tunnel.
+    ///
+    /// This is a movement value only.
+    /// It is NOT a ship rotation.
     var lateralAngle: Double = 0.0
+
+    /// Vertical position inside the tunnel.
     var verticalPosition: CGFloat = 0.0
+
+    /// Fraction of the available tunnel radius.
     var radialOffset: CGFloat = Tunnel.shipRadialInset
+
+    // MARK: - Ocean Position
+
     var oceanX: CGFloat = 0.0
     var oceanY: CGFloat = 0.0
+
+    // MARK: - Input
+
     var lateralInput: Double = 0.0
     var verticalInput: Double = 0.0
+
+    // MARK: - Forward Motion
+
+    /// Forward movement speed through the tunnel.
+    ///
+    /// The ship itself remains at Z = 0.
+    /// Tunnel objects move relative to it.
     var forwardSpeed: CGFloat = 12.0
+
+    /// Logical forward position.
+    ///
+    /// This is NOT the SceneKit Z position.
     var z: CGFloat = 0.0
+
+    /// Total tunnel progress.
     var progress: CGFloat = 0.0
 
-   
-      /// This method contains NO ocean logic.
+
+    // MARK: - Tunnel Update
+
     mutating func updateTunnel(dt: CGFloat) {
 
         let lateralSpeed: CGFloat = 1.8
         let verticalSpeed: CGFloat = 6.0
 
+
         // ============================================================
         // LEFT / RIGHT AROUND THE TUNNEL
         // ============================================================
-
+        //
+        // lateralAngle determines WHERE the ship is located.
+        //
+        // It does NOT rotate the ship.
+        //
         lateralAngle +=
             lateralInput *
             Double(lateralSpeed * dt)
@@ -54,6 +110,7 @@ struct SpaceShip {
             lateralAngle += 2.0 * Double.pi
         }
 
+
         // ============================================================
         // UP / DOWN
         // ============================================================
@@ -63,23 +120,27 @@ struct SpaceShip {
             verticalSpeed *
             dt
 
+
         // ============================================================
         // TUNNEL BOUNDARY
-        //
-        // The ship must remain inside the cylindrical tunnel.
         // ============================================================
 
         let shipClearance: CGFloat = 0.55
 
-        let maximumRadius =
-            max(
-                0.0,
-                Tunnel.radius - shipClearance
-            )
+        let maximumRadius = max(
+            0.0,
+            Tunnel.radius - shipClearance
+        )
 
-        // X position is determined by the ship's position
-        // around the tunnel circumference.
 
+        // ============================================================
+        // CALCULATE X/Y POSITION
+        // ============================================================
+        //
+        // This moves the ship.
+        //
+        // No rotation occurs here.
+        //
         let worldRadius =
             maximumRadius * radialOffset
 
@@ -90,40 +151,55 @@ struct SpaceShip {
         var worldY =
             verticalPosition
 
+
         // ============================================================
         // HARD RADIAL CONSTRAINT
-        //
-        // sqrt(X² + Y²) must never exceed the tunnel radius.
         // ============================================================
-
+        //
+        // Keep the ship inside the tunnel.
+        //
         let distanceFromCenter =
-            hypot(worldX, worldY)
+            hypot(
+                worldX,
+                worldY
+            )
 
         if distanceFromCenter > maximumRadius {
 
             let scale =
                 maximumRadius /
-                max(distanceFromCenter, 0.000001)
+                max(
+                    distanceFromCenter,
+                    0.000001
+                )
 
             worldX *= scale
             worldY *= scale
 
-            // Keep the stored vertical position synchronized
-            // with the constrained world position.
             verticalPosition = worldY
         }
 
-        // ============================================================
-        // FORWARD
-        // ============================================================
 
+        // ============================================================
+        // FORWARD PROGRESS
+        // ============================================================
+        //
+        // The ship stays visually at Z = 0.
+        //
+        // The tunnel/enemies/asteroids move relative to the ship.
+        //
         z += forwardSpeed * dt
         progress += forwardSpeed * dt
 
-        // ============================================================
-        // TUNNEL WORLD POSITION
-        // ============================================================
 
+        // ============================================================
+        // FINAL WORLD POSITION
+        // ============================================================
+        //
+        // POSITION ONLY.
+        //
+        // There is deliberately no rotation here.
+        //
         position = SCNVector3(
             Float(worldX),
             Float(worldY),
@@ -131,36 +207,24 @@ struct SpaceShip {
         )
     }
 
-    // ============================================================
-    // OCEAN UPDATE
-    // ============================================================
 
-    /// Updates the ship using ocean flight physics.
-    ///
-    /// The ocean has NO tunnel/radial physics.
-    ///
-    /// X = left/right
-    /// Y = up/down
-    /// Z = forward
+    // MARK: - Ocean Update
+
     mutating func updateOcean(dt: CGFloat) {
 
         let lateralSpeed: CGFloat = 1.8
         let verticalSpeed: CGFloat = 6.0
 
-        let oldX = oceanX
-        let oldY = oceanY
-        let oldZ = 0.0
 
-        // --------------------------------------------------------
+        // ============================================================
         // LEFT / RIGHT
-        // --------------------------------------------------------
+        // ============================================================
 
         oceanX +=
             lateralInput *
             lateralSpeed *
             dt
 
-        
         oceanX = max(
             oceanMinimumX,
             min(
@@ -169,9 +233,10 @@ struct SpaceShip {
             )
         )
 
-        // --------------------------------------------------------
+
+        // ============================================================
         // UP / DOWN
-        // --------------------------------------------------------
+        // ============================================================
 
         oceanY +=
             verticalInput *
@@ -194,78 +259,42 @@ struct SpaceShip {
             )
         )
 
-        // --------------------------------------------------------
-        // FORWARD
-        // --------------------------------------------------------
 
-       // z += forwardSpeed * dt
-       // progress += forwardSpeed * dt
-
-        // --------------------------------------------------------
+        // ============================================================
         // WORLD POSITION
-        // --------------------------------------------------------
-
+        // ============================================================
+        //
+        // Again: position only.
+        // No ship rotation.
+        //
         position = SCNVector3(
             Float(oceanX),
             Float(oceanY),
-            Float(0.0)
+            0.0
         )
 
         verticalPosition = oceanY
-
-        // --------------------------------------------------------
-        // DEBUG POSITION CHANGE
-        // --------------------------------------------------------
-/*
-        if oldX != oceanX ||
-           oldY != oceanY ||
-           oldZ != z {
-
-            print("""
-            ==================================================
-            OCEAN SHIP MOVED
-            ==================================================
-            INPUT:
-              lateral = \(lateralInput)
-              vertical = \(verticalInput)
-
-            POSITION BEFORE:
-              x = \(oldX)
-              y = \(oldY)
-              z = \(oldZ)
-
-            POSITION AFTER:
-              x = \(oceanX)
-              y = \(oceanY)
-              z = \(z)
-
-            SCNVector3:
-              x = \(position.x)
-              y = \(position.y)
-              z = \(position.z)
-
-            ==================================================
-            """)
-        }
-*/
     }
-    // ============================================================
-    // OPTIONAL COMPATIBILITY UPDATE
-    // ============================================================
 
-    /// Compatibility wrapper for existing callers.
-    ///
-    /// New code should preferably call updateTunnel() or
-    /// updateOcean() explicitly.
+
+    // MARK: - Main Update
+
     mutating func update(
         dt: CGFloat,
         currentSection: SceneSection
     ) {
 
         if currentSection == .ocean {
-            updateOcean(dt: dt)
+
+            updateOcean(
+                dt: dt
+            )
+
         } else {
-            updateTunnel(dt: dt)
+
+            updateTunnel(
+                dt: dt
+            )
         }
     }
 }

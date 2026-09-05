@@ -184,12 +184,20 @@ final class GameState: ObservableObject {
         }
 
         // --------------------------------------------------------
-        // PLAYER LASERS
+        // Update all player lasers
         // --------------------------------------------------------
-
         for index in playerLasers.indices {
-
             playerLasers[index].update(
+                dt: deltaTime,
+                shipSpeed: spaceShip.forwardSpeed
+            )
+        }
+
+        // --------------------------------------------------------
+        // Update all enemy lasers
+        // --------------------------------------------------------
+        for index in enemyLasers.indices {
+            enemyLasers[index].update(
                 dt: deltaTime,
                 shipSpeed: spaceShip.forwardSpeed
             )
@@ -289,7 +297,6 @@ final class GameState: ObservableObject {
             )
         )
     }
-
     func startFiring() {
 
         guard !gameOver else {
