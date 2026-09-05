@@ -445,7 +445,11 @@ final class TunnelSceneWorld {
             halfLength,
             0
         )
-
+         muzzleNode.eulerAngles = SCNVector3(
+                    Float.pi / 2.0,
+                   0,
+                    0
+                )
 
         cannonBarrel.addChildNode(muzzleNode)
     }
