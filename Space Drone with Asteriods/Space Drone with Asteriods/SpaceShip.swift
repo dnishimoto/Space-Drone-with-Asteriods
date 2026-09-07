@@ -288,7 +288,7 @@ struct SpaceShip {
         // ============================================================
 
         var worldX =
-            CGFloat(position.x) +
+            CGFloat(position.x) -
             lateralInput *
             terrainLateralSpeed *
             dt

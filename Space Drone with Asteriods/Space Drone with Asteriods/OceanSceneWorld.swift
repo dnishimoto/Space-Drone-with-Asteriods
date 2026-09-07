@@ -866,15 +866,6 @@ final class OceanSceneWorld {
         processExplosions(
             gameState
         )
-        /*
-        print("""
-        [OCEAN SYNC]
-        Game Ship Position:
-            x = \(gameState.spaceShip.position.x)
-            y = \(gameState.spaceShip.position.y)
-            z = \(gameState.spaceShip.position.z)
-        """)
-         */
     }
 
 
