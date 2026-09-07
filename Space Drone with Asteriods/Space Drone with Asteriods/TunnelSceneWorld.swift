@@ -447,7 +447,7 @@ final class TunnelSceneWorld {
         )
          muzzleNode.eulerAngles = SCNVector3(
                     Float.pi / 2.0,
-                   0,
+                    0,
                     0
                 )
 
@@ -483,9 +483,9 @@ final class TunnelSceneWorld {
         shipMesh.eulerAngles.x =
             .pi / 2
 
-        shipRoot.addChildNode(
-            shipMesh
-        )
+        //shipRoot.addChildNode(
+        //    shipMesh
+        //)
 
         // ========================================================
         // THRUSTER
@@ -520,9 +520,9 @@ final class TunnelSceneWorld {
         thrusterFlame.isHidden =
             true
 
-        shipRoot.addChildNode(
-            thrusterFlame
-        )
+        //shipRoot.addChildNode(
+       // //    thrusterFlame
+        //)
 
         // ========================================================
         // SHIELD

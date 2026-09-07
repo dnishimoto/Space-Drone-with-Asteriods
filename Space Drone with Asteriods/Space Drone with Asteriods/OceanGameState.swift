@@ -460,19 +460,15 @@ enum OceanGameState {
 
         for laser in laserList {
 
-            let laserPosition =
-                laser.worldPosition()
+            let laserPosition = laser.worldPosition()
 
             for asteroid in game.asteroids {
 
-                let asteroidPosition =
-                    asteroid.tunnelPosition
+                let asteroidPosition = asteroid.oceanPosition
 
-                let collisionRadius:
-                    CGFloat
+                let collisionRadius: CGFloat
 
                 switch asteroid.size {
-
                 case .small:
                     collisionRadius = 1.1
 
@@ -483,41 +479,28 @@ enum OceanGameState {
                     collisionRadius = 3.1
                 }
 
+                let collisionDistance = vectorDistance(
+                    laserPosition,
+                    asteroidPosition
+                )
 
-                let collisionDistance =
-                    vectorDistance(
-                        laserPosition,
-                        asteroidPosition
-                    )
+                if collisionDistance <= collisionRadius {
 
-
-                if collisionDistance <=
-                    collisionRadius {
-
-                    game.score +=
-                        asteroid.size.score
-
+                    game.score += asteroid.size.score
 
                     game.spawnExplosion(
-                        x: CGFloat(
-                            asteroidPosition.x
-                        ),
-                        y: CGFloat(
-                            asteroidPosition.y
-                        ),
-                        z: CGFloat(
-                            asteroidPosition.z
-                        ),
+                        x: CGFloat(asteroidPosition.x),
+                        y: CGFloat(asteroidPosition.y),
+                        z: CGFloat(asteroidPosition.z),
                         scale:
                             asteroid.size == .large
                             ? 1.6
                             : 1.0
                     )
 
+                    asteroidsToRemove.append(asteroid)
 
-                    asteroidsToRemove.append(
-                        asteroid
-                    )
+                    print("Asteroid destroyed")
 
                     break
                 }

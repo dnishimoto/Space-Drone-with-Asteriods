@@ -1,4 +1,3 @@
-
 import SwiftUI
 import SceneKit
 import QuartzCore
@@ -7,7 +6,7 @@ import QuartzCore
 // MARK: - SceneKit Container
 // ============================================================
 
-// Coordinator that owns both scene worlds and switches between
+// Coordinator that owns all three scene worlds and switches between
 // them based on GameState.currentSection.
 
 final class GameSceneCoordinator: NSObject {
@@ -18,21 +17,33 @@ final class GameSceneCoordinator: NSObject {
 
     let oceanWorld = OceanSceneWorld()
     let tunnelWorld = TunnelSceneWorld()
+    let terrainWorld = TerrainSceneWorld()
 
     // ============================================================
     // ACTIVE WORLD
     // ============================================================
 
-    private(set) var usingOcean = false
+    enum ActiveWorld {
+        case tunnel
+        case ocean
+        case terrain
+    }
+
+    private(set) var activeWorld: ActiveWorld = .tunnel
 
     // ============================================================
     // SCENE
     // ============================================================
 
     var scene: SCNScene {
-        usingOcean
-            ? oceanWorld.scene
-            : tunnelWorld.scene
+        switch activeWorld {
+        case .ocean:
+            return oceanWorld.scene
+        case .tunnel:
+            return tunnelWorld.scene
+        case .terrain:
+            return terrainWorld.scene
+        }
     }
 
     // ============================================================
@@ -40,9 +51,14 @@ final class GameSceneCoordinator: NSObject {
     // ============================================================
 
     var camera: SCNNode {
-        usingOcean
-            ? oceanWorld.camera
-            : tunnelWorld.camera
+        switch activeWorld {
+        case .ocean:
+            return oceanWorld.camera
+        case .tunnel:
+            return tunnelWorld.camera
+        case .terrain:
+            return terrainWorld.camera
+        }
     }
 
     // ============================================================
@@ -69,30 +85,33 @@ final class GameSceneCoordinator: NSObject {
         // DETERMINE ACTIVE WORLD
         // ========================================================
 
-        let shouldUseOcean =
-            game.currentSection == .ocean
+        let newActiveWorld: ActiveWorld
+        switch game.currentSection {
+        case .ocean:
+            newActiveWorld = .ocean
+        case .tunnel:
+            newActiveWorld = .tunnel
+        case .terrain:
+            newActiveWorld = .terrain
+        }
 
         let switched =
-            shouldUseOcean != usingOcean
+            newActiveWorld != activeWorld
 
-        usingOcean =
-            shouldUseOcean
+        activeWorld =
+            newActiveWorld
 
         // ========================================================
         // RENDER ACTIVE WORLD
         // ========================================================
 
-        if usingOcean {
-
-            oceanWorld.sync(
-                with: game
-            )
-
-        } else {
-
-            tunnelWorld.sync(
-                with: game
-            )
+        switch activeWorld {
+        case .ocean:
+            oceanWorld.sync(with: game)
+        case .tunnel:
+            tunnelWorld.sync(with: game)
+        case .terrain:
+            terrainWorld.sync(with: game)
         }
 
         // ========================================================
@@ -639,46 +658,7 @@ struct JoystickView: View {
     }
 }
 
-// ============================================================
-// MARK: - Volume View
-// ============================================================
 
-struct VolumeView: View {
-
-    @Binding var volume: Double
-
-    @Environment(\.dismiss)
-    private var dismiss
-
-    var body: some View {
-
-        VStack(spacing: 20) {
-
-            Text("Sound Volume")
-                .font(.headline)
-
-            Slider(
-                value: $volume,
-                in: 0...1
-            )
-            .padding(.horizontal)
-
-            Text(
-                "Volume: \(Int(volume * 100))%"
-            )
-            .foregroundColor(.secondary)
-
-            Button("Close") {
-                dismiss()
-            }
-            .padding(.top, 8)
-        }
-        .padding()
-        .presentationDetents(
-            [.height(220)]
-        )
-    }
-}
 
 
 // ============================================================
@@ -1161,6 +1141,9 @@ struct ContentView: View {
 
         case .ocean:
             return "ALIEN OCEAN"
+            
+        case .terrain:
+            return "TERRAIN"
         }
     }
 

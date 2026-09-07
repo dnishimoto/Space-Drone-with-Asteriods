@@ -6,6 +6,7 @@ import Combine
 enum SceneSection {
     case tunnel
     case ocean
+    case terrain // Added for TERRAIN scene support
 }
 
 @MainActor
@@ -55,8 +56,8 @@ final class GameState: ObservableObject {
     // GAME
     // ============================================================
 
-    //@Published var score = 20_000
-    @Published var score = 0
+    @Published var score = 40_000
+    //@Published var score = 0
 
     @Published var gameOver = false
 
@@ -66,7 +67,7 @@ final class GameState: ObservableObject {
 
     @Published private(set) var shieldActive = false
 
-    @Published var currentSection: SceneSection = .tunnel
+    @Published var currentSection: SceneSection = .tunnel // Default tunnel, allow terrain future support
 
     @Published var playCollisionSound = true
 
@@ -179,8 +180,13 @@ final class GameState: ObservableObject {
                 gameState: self,
                 dt: deltaTime
             )
+            
+        case .terrain: // Added for TERRAIN scene support
+            TerrainGameState.update(
+                gameState: self,
+                dt: deltaTime
+            )
 
- 
         }
 
         // --------------------------------------------------------
@@ -242,14 +248,14 @@ final class GameState: ObservableObject {
 
         case .ocean:
 
-            if score >= 60_000 {
-                
+            if score >= 40_000 {
+                currentSection = .terrain // Added for TERRAIN scene support
             }
 
-      
-        default:
-            
-            currentSection = .tunnel
+        case .terrain: // Added for TERRAIN scene support
+            // Future progression logic for terrain can be added here
+            break
+
         }
 
         frameTick &+= 1
@@ -447,7 +453,7 @@ final class GameState: ObservableObject {
 
         frameTick = 0
         
-        currentSection = .tunnel
+        currentSection = .tunnel // Default tunnel, keep terrain for future
         
         //currentSection = .ocean
 

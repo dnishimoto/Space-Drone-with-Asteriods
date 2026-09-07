@@ -330,7 +330,7 @@ final class OceanSceneWorld {
         bodyGeo.firstMaterial?.emission.contents = UIColor(white: 0.2, alpha: 1)
         shipMesh.geometry = bodyGeo
         shipMesh.eulerAngles.x = .pi / 2
-        shipRoot.addChildNode(shipMesh)
+        //shipRoot.addChildNode(shipMesh)
 
         let flameGeo = SCNCone(topRadius: 0, bottomRadius: 0.12, height: 0.45)
         flameGeo.firstMaterial?.diffuse.contents = UIColor.orange
@@ -339,7 +339,7 @@ final class OceanSceneWorld {
         thrusterFlame.eulerAngles.x = -.pi / 2
         thrusterFlame.position = SCNVector3(0, 0, -0.55)
         thrusterFlame.isHidden = true
-        shipRoot.addChildNode(thrusterFlame)
+       // shipRoot.addChildNode(thrusterFlame)
 
         let shieldGeo = SCNSphere(radius: 0.55)
         shieldGeo.firstMaterial?.diffuse.contents = UIColor.cyan.withAlphaComponent(0.15)
@@ -347,7 +347,7 @@ final class OceanSceneWorld {
         shieldGeo.firstMaterial?.transparency = 0.5
         shieldNode.geometry = shieldGeo
         shieldNode.isHidden = true
-        shipRoot.addChildNode(shieldNode)
+       // shipRoot.addChildNode(shieldNode)
 
         scene.rootNode.addChildNode(shipRoot)
     }
@@ -467,7 +467,9 @@ final class OceanSceneWorld {
         let shipPosition =
             gameState.spaceShip.position
 
-        shipRoot.position = shipPosition
+        // Ensure the ship's Y position is at or above ocean surface.
+        // This sets the initial ship position above the ocean surface.
+        shipRoot.position = SCNVector3(shipPosition.x, max(shipPosition.y, oceanSurfaceY), shipPosition.z)
 
 
         // Ship rotation around the tunnel is retained for
