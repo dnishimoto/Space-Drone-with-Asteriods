@@ -1290,7 +1290,6 @@ final class TerrainSceneWorld {
     private func updateCannonAim(
         gameState: GameState
     ) {
-
         let yaw =
             Float(
                 gameState.cannonAzimuth
@@ -1302,7 +1301,6 @@ final class TerrainSceneWorld {
             )
 
         // SAME CONVENTION AS OCEAN.
-
         cannonBarrelPivot.eulerAngles =
             SCNVector3(
                 pitch,
@@ -1324,53 +1322,50 @@ final class TerrainSceneWorld {
         // Actual cannon world direction
         // =============================================================
         //
-        // SceneKit forward = -Z.
+        // SceneKit forward = local -Z.
         //
-        // We transform a point one unit along -Z from the actual
-        // rendered muzzle node into world coordinates.
-        //
+        // IMPORTANT:
+        // Use simdWorldOrientation rather than worldOrientation.
+        // worldOrientation is an SCNQuaternion and does not provide
+        // the SIMD .act() operation.
+        // =============================================================
 
         let localForward =
-            SCNVector3(
+            SIMD3<Float>(
                 0,
                 0,
                 -1
             )
 
-        let worldForward =
-            muzzleNode.presentation.convertPosition(
-                localForward,
-                to: scene.rootNode
+        let worldOrientation =
+            muzzleNode.presentation.simdWorldOrientation
+
+        let worldDirection =
+            worldOrientation.act(
+                localForward
             )
 
-        let direction =
-            SCNVector3(
-                worldForward.x -
-                    muzzleWorldPosition.x,
-
-                worldForward.y -
-                    muzzleWorldPosition.y,
-
-                worldForward.z -
-                    muzzleWorldPosition.z
-            )
+        // =============================================================
+        // Normalize direction
+        // =============================================================
 
         let directionLength =
             sqrt(
-                direction.x * direction.x +
-                direction.y * direction.y +
-                direction.z * direction.z
+                worldDirection.x * worldDirection.x +
+                worldDirection.y * worldDirection.y +
+                worldDirection.z * worldDirection.z
             )
 
-        if directionLength > 0.0001 {
-
-            gameState.cannonWorldDirection =
-                SCNVector3(
-                    direction.x / directionLength,
-                    direction.y / directionLength,
-                    direction.z / directionLength
-                )
+        guard directionLength > 0.0001 else {
+            return
         }
+
+        gameState.cannonWorldDirection =
+            SCNVector3(
+                worldDirection.x / directionLength,
+                worldDirection.y / directionLength,
+                worldDirection.z / directionLength
+            )
     }
 
     // =========================================================================

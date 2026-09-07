@@ -132,6 +132,7 @@ final class GameState: ObservableObject {
             stopFiring()
             return
         }
+        
 
         let deltaTime = dt
 
@@ -143,26 +144,9 @@ final class GameState: ObservableObject {
 
         let rawX = joystickVector.dx
 
-        spaceShip.lateralInput =
-            abs(rawX) > deadzone
-            ? Double(max(-1.0, min(1.0, rawX)))
-            : 0.0
-
-        let rawY = -joystickVector.dy
-
-        spaceShip.verticalInput =
-            abs(rawY) > deadzone
-            ? Double(max(-1.0, min(1.0, rawY)))
-            : 0.0
-
         // --------------------------------------------------------
         // PLAYER
         // --------------------------------------------------------
-
-        spaceShip.update(dt: deltaTime,currentSection: currentSection)
-
-        
-      
         // --------------------------------------------------------
         // SECTION-SPECIFIC GAMEPLAY
         // --------------------------------------------------------
@@ -188,6 +172,24 @@ final class GameState: ObservableObject {
             )
 
         }
+        
+        
+        spaceShip.lateralInput =
+            abs(rawX) > deadzone
+            ? Double(max(-1.0, min(1.0, rawX)))
+            : 0.0
+
+        let rawY = -joystickVector.dy
+
+        spaceShip.verticalInput =
+            abs(rawY) > deadzone
+            ? Double(max(-1.0, min(1.0, rawY)))
+            : 0.0
+
+     
+        
+        spaceShip.update(dt: deltaTime,currentSection: currentSection)
+      
 
         // --------------------------------------------------------
         // Update all player lasers
@@ -195,7 +197,8 @@ final class GameState: ObservableObject {
         for index in playerLasers.indices {
             playerLasers[index].update(
                 dt: deltaTime,
-                shipSpeed: spaceShip.forwardSpeed
+                shipSpeed:
+                    Float(spaceShip.forwardSpeed)
             )
         }
 
@@ -205,17 +208,18 @@ final class GameState: ObservableObject {
         for index in enemyLasers.indices {
             enemyLasers[index].update(
                 dt: deltaTime,
-                shipSpeed: spaceShip.forwardSpeed
+                shipSpeed: Float(spaceShip.forwardSpeed)
             )
         }
 
-        // --------------------------------------------------------
-        // LASER RANGE
-        // --------------------------------------------------------
+        let maxLaserDistance: CGFloat = 500.0
 
         playerLasers.removeAll { laser in
-            laser.z > 90.0 ||
-            laser.z < -5.0
+            laser.distance >= maxLaserDistance
+        }
+
+        enemyLasers.removeAll { laser in
+            laser.distance >= maxLaserDistance
         }
 
         enemyLasers.removeAll { laser in
@@ -265,37 +269,62 @@ final class GameState: ObservableObject {
     // CANNON FIRE
     // ============================================================
 
+
     func shootLaser() {
         guard !gameOver else {
             return
         }
 
         // ============================================================
-        // ROTATE, THEN TRANSLATE
+        // Capture the cannon state AT THE MOMENT OF FIRING.
         //
-        // Direction: cannonWorldDirection is the cannon's local
-        // forward vector (0,0,-1) ROTATED into world space through
-        // the full node chain (ship -> camera -> cockpit -> barrel
-        // pivot -> barrel -> muzzle). It reflects the cannon's actual
-        // rendered aim, including any ship rotation/roll.
+        // These are already in WORLD SPACE:
         //
-        // Origin: cannonMuzzleWorldPosition is that same muzzle node
-        // TRANSLATED into world space.
+        // cannonMuzzleWorldPosition = laser origin
+        // cannonWorldDirection      = laser direction
         //
-        // Previously this recomputed direction from raw
-        // cannonAzimuth/cannonElevation via Laser.makeCannonDirection,
-        // which assumes the cannon's parent frame IS the world frame.
-        // That ignores the ship's own orientation, so the fired laser
-        // direction could disagree with where the cannon is actually
-        // pointing on screen. Using the already-rotated world vector
-        // keeps the two in sync.
+        // The laser must keep these values after it is fired.
+        // Moving the ship afterward must not change the laser direction.
         // ============================================================
 
-        let muzzle = cannonMuzzleWorldPosition
+        let muzzle =
+            cannonMuzzleWorldPosition
 
-        let direction = cannonWorldDirection
+        let rawDirection =
+            cannonWorldDirection
 
-        playerLasers.append(
+        // ============================================================
+        // Normalize the world-space firing direction.
+        // ============================================================
+
+        let length =
+            sqrt(
+                rawDirection.x * rawDirection.x +
+                rawDirection.y * rawDirection.y +
+                rawDirection.z * rawDirection.z
+            )
+
+        guard length > 0.0001 else {
+            return
+        }
+
+        let direction =
+            SCNVector3(
+                rawDirection.x / length,
+                rawDirection.y / length,
+                rawDirection.z / length
+            )
+
+        // ============================================================
+        // Create the laser.
+        //
+        // origin and direction are now independent snapshots.
+        //
+        // DO NOT recalculate direction from cannonAzimuth,
+        // cannonElevation, or ship Z after this point.
+        // ============================================================
+
+        let laser =
             Laser(
                 lateralAngle: cannonAzimuth,
                 elevationAngle: cannonElevation,
@@ -305,8 +334,13 @@ final class GameState: ObservableObject {
                 stepSize: 0.1,
                 isPlayerLaser: true
             )
+
+        playerLasers.append(
+            laser
         )
     }
+
+
     func startFiring() {
 
         guard !gameOver else {
