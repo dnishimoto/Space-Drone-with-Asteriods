@@ -1129,21 +1129,26 @@ final class TerrainSceneWorld {
 
     private func updateShipPosition(
         x: Float,
+        y: Float,
         z: Float
     ) {
+        let terrainY = terrainHeightAt(
+            worldX: x,
+            worldZ: z
+        )
 
-        let groundY =
-            terrainHeightAt(
-                worldX: x,
-                worldZ: z
-            )
+        let minimumShipY = terrainY + shipHeightOffset
 
-        shipRoot.position =
-            SCNVector3(
-                x,
-                groundY + shipHeightOffset,
-                z
-            )
+        let resolvedY = max(
+            y,
+            minimumShipY
+        )
+
+        shipRoot.position = SCNVector3(
+            x,
+            resolvedY,
+            z
+        )
 
         recycleTerrain(
             aroundZ: z
@@ -1446,6 +1451,7 @@ final class TerrainSceneWorld {
 
         updateShipPosition(
             x: shipPosition.x,
+            y: shipPosition.y,
             z: shipPosition.z
         )
 

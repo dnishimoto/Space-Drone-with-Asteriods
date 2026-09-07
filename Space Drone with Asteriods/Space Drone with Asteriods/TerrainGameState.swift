@@ -107,6 +107,14 @@ enum TerrainGameState {
             playerPosition: playerPosition,
             dt: deltaTime
         )
+
+        // =====================================================================
+        // 5. Check collisions
+        // =====================================================================
+
+        checkCollisions(
+            gameState: gameState
+        )
     }
 
     // =========================================================================
@@ -230,6 +238,82 @@ enum TerrainGameState {
         _ = gameState
         _ = playerPosition
         _ = dt
+    }
+
+    // =========================================================================
+    // MARK: - Collisions
+    // =========================================================================
+
+    private static func checkCollisions(
+        gameState: GameState
+    ) {
+
+        // ---------------------------------------------------------------
+        // PLAYER LASERS → SHARKS
+        //
+        // This scene previously had no collision detection at all --
+        // TerrainSceneWorld.sync() never called any check, so player
+        // lasers passed straight through sharks. Mirrors the same
+        // laser-vs-shark distance check OceanGameState already uses.
+        // ---------------------------------------------------------------
+
+        var sharksToRemove: [Shark] = []
+
+        let collisionRadius: Float = 0.5
+
+        for laser in gameState.playerLasers {
+
+            let laserPosition =
+                laser.worldPosition()
+
+            for shark in gameState.sharks {
+
+                if shark.destroyed {
+                    continue
+                }
+
+                if sharksToRemove.contains(
+                    where: { $0 === shark }
+                ) {
+                    continue
+                }
+
+                let sharkPosition =
+                    shark.position
+
+                let collisionDistance =
+                    distance(
+                        from: laserPosition,
+                        to: sharkPosition
+                    )
+
+                if collisionDistance <= collisionRadius {
+
+                    shark.destroyed = true
+
+                    gameState.score += 100
+
+                    gameState.spawnExplosion(
+                        x: CGFloat(sharkPosition.x),
+                        y: CGFloat(sharkPosition.y),
+                        z: CGFloat(sharkPosition.z),
+                        scale: 1.0
+                    )
+
+                    sharksToRemove.append(shark)
+
+                    // This laser has hit something.
+                    break
+                }
+            }
+        }
+
+        for shark in sharksToRemove {
+
+            gameState.sharks.removeAll {
+                $0 === shark
+            }
+        }
     }
 
     // =========================================================================
