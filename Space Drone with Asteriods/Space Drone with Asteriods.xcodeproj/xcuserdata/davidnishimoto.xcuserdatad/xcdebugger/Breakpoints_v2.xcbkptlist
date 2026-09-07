@@ -231,32 +231,16 @@
       <BreakpointProxy
          BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
          <BreakpointContent
-            uuid = "50908806-98FC-4A5C-94C3-FEACB7EFB6FC"
-            shouldBeEnabled = "No"
+            uuid = "94A70560-9B59-47F6-A065-B1BE1A9527C5"
+            shouldBeEnabled = "Yes"
             ignoreCount = "0"
             continueAfterRunningActions = "No"
-            filePath = "Space Drone with Asteriods/TerrainSceneWorld.swift"
+            filePath = "Space Drone with Asteriods/SpaceShip.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "1456"
-            endingLineNumber = "1456"
-            landmarkName = "sync(with:)"
-            landmarkType = "7">
-         </BreakpointContent>
-      </BreakpointProxy>
-      <BreakpointProxy
-         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
-         <BreakpointContent
-            uuid = "93CF875D-4AA3-4F72-8287-9D380A64F286"
-            shouldBeEnabled = "No"
-            ignoreCount = "0"
-            continueAfterRunningActions = "No"
-            filePath = "Space Drone with Asteriods/TerrainSceneWorld.swift"
-            startingColumnNumber = "9223372036854775807"
-            endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "1454"
-            endingLineNumber = "1454"
-            landmarkName = "sync(with:)"
+            startingLineNumber = "283"
+            endingLineNumber = "283"
+            landmarkName = "updateOcean(dt:)"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>

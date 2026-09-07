@@ -47,6 +47,31 @@ final class SharkManager {
     private let minimumOceanX: CGFloat = -7.0
     private let maximumOceanX: CGFloat = 7.0
 
+    // ================================================================
+    // TERRAIN BOUNDS
+    //
+    // SharkManager is shared between the Ocean and Terrain scenes.
+    // The ocean bounds above describe a small, fixed swim box, which
+    // is much narrower than the open terrain ground plane (see
+    // TerrainSceneWorld.terrainWidth / SpaceShip.terrainMinimumX/
+    // terrainMaximumX). Reusing the ocean's +/-7 box on terrain
+    // trapped every shark near the origin, far from wherever the
+    // ship actually was, which is why the "swarm attack" never
+    // reached the ship on terrain.
+    //
+    // Vertical bounds are intentionally wide (not tied to a fixed
+    // range like the ocean): terrain elevation varies with position,
+    // and the real floor constraint is enforced separately by
+    // TerrainSceneWorld using the actual generated terrain height,
+    // which SharkManager has no access to.
+    // ================================================================
+
+    private let minimumTerrainX: CGFloat = -36.0
+    private let maximumTerrainX: CGFloat = 36.0
+
+    private let minimumTerrainY: CGFloat = -40.0
+    private let maximumTerrainY: CGFloat = 40.0
+
     // MARK: - Cellular Automata
 
     // Size of each hunting cell.
@@ -145,15 +170,29 @@ final class SharkManager {
         // ============================================================
         // RANDOM SPAWN POSITION
         // ============================================================
+        //
+        // Terrain uses a much wider spawn box, and spawns vertically
+        // near the ship's own (terrain-height-corrected) altitude
+        // instead of the ocean's fixed -1.5...8 band, since terrain
+        // elevation varies with position.
+        // ============================================================
+
+        let isTerrain =
+            game.currentSection == .terrain
 
         let spawnX =
             CGFloat.random(
                 in:
-                    minimumOceanX...maximumOceanX
+                    isTerrain
+                    ? minimumTerrainX...maximumTerrainX
+                    : minimumOceanX...maximumOceanX
             )
 
-        let spawnY =
-            CGFloat.random(
+        let spawnY: CGFloat =
+            isTerrain
+            ? shipY +
+                CGFloat.random(in: -2.0...6.0)
+            : CGFloat.random(
                 in:
                     minimumOceanY...maximumOceanY
             )
@@ -305,6 +344,9 @@ final class SharkManager {
         dt: CGFloat
     ) {
 
+        let isTerrain =
+            game.currentSection == .terrain
+
         for shark in game.sharks {
 
             guard !shark.destroyed else {
@@ -324,12 +366,28 @@ final class SharkManager {
             )
 
             // ========================================================
-            // OCEAN BOUNDARIES
+            // SCENE BOUNDARIES
+            //
+            // Terrain uses its own wider X bound and skips the fixed
+            // ocean Y clamp entirely -- clamping every shark's Y into
+            // the ocean's -1.5...8 band would either sink it below
+            // terrain peaks or leave it floating above valley floors.
+            // The terrain scene enforces the real floor afterward
+            // using the actual generated terrain height.
             // ========================================================
 
-            applyOceanBounds(
-                shark: shark
-            )
+            if isTerrain {
+
+                applyTerrainXBounds(
+                    shark: shark
+                )
+
+            } else {
+
+                applyOceanBounds(
+                    shark: shark
+                )
+            }
         }
     }
 
@@ -580,6 +638,21 @@ final class SharkManager {
         var bestScore =
             -CGFloat.greatestFiniteMagnitude
 
+        let isTerrain =
+            game.currentSection == .terrain
+
+        let cellMinimumX =
+            isTerrain ? minimumTerrainX : minimumOceanX
+
+        let cellMaximumX =
+            isTerrain ? maximumTerrainX : maximumOceanX
+
+        let cellMinimumY =
+            isTerrain ? minimumTerrainY : minimumOceanY
+
+        let cellMaximumY =
+            isTerrain ? maximumTerrainY : maximumOceanY
+
         // ============================================================
         // HUNTING FACTOR
         // ============================================================
@@ -619,33 +692,33 @@ final class SharkManager {
                 )
 
             // ========================================================
-            // OCEAN BOUNDS
+            // SCENE BOUNDS (Ocean box or Terrain ground plane)
             // ========================================================
 
             if CGFloat(
                 candidatePosition.x
-            ) < minimumOceanX {
+            ) < cellMinimumX {
 
                 continue
             }
 
             if CGFloat(
                 candidatePosition.x
-            ) > maximumOceanX {
+            ) > cellMaximumX {
 
                 continue
             }
 
             if CGFloat(
                 candidatePosition.y
-            ) < minimumOceanY {
+            ) < cellMinimumY {
 
                 continue
             }
 
             if CGFloat(
                 candidatePosition.y
-            ) > maximumOceanY {
+            ) > cellMaximumY {
 
                 continue
             }
@@ -1094,6 +1167,37 @@ final class SharkManager {
                     maximumOceanY
                 )
         }
+
+        shark.position =
+            position
+    }
+
+    // MARK: - Terrain X Bounds
+
+    private func applyTerrainXBounds(
+        shark: Shark
+    ) {
+
+        var position =
+            shark.position
+
+        if CGFloat(position.x) <
+            minimumTerrainX {
+
+            position.x =
+                Float(minimumTerrainX)
+        }
+
+        if CGFloat(position.x) >
+            maximumTerrainX {
+
+            position.x =
+                Float(maximumTerrainX)
+        }
+
+        // No Y clamp here -- TerrainSceneWorld enforces the real
+        // terrain floor using the actual generated height at this
+        // shark's (x, z), which this manager has no access to.
 
         shark.position =
             position

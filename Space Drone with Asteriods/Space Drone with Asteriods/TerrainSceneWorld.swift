@@ -1424,34 +1424,25 @@ final class TerrainSceneWorld {
             170.0
 
         // =====================================================================
-        // GAME MANAGERS
-        // =====================================================================
-        //
-        // These remain owned by GameState.
-        //
-        // The renderer does not create or simulate sharks itself.
-        //
-
-        gameState.sharkManager.update(
-            game: gameState,
-            dt: dt
-        )
-
-        gameState.asteroidManager.update(
-            game: gameState,
-            dt: dt
-        )
-
-        // =====================================================================
         // PLAYER SHIP
         // =====================================================================
+        //
+        // gameState.spaceShip already advances X (lateral input) and Z
+        // (forward progress) for the terrain scene -- see
+        // SpaceShip.updateTerrain(). Read that position directly instead
+        // of recomputing forward progress locally: the previous local
+        // `shipPosition.z += terrainSpeed * dt` was never written back
+        // into GameState, so the ship's logical Z reset to 0 every
+        // frame and terrain forward progress never actually
+        // accumulated.
+        //
+        // This section now runs BEFORE the game managers below so that
+        // shark hunting AI (which targets gameState.spaceShip.position)
+        // uses this frame's ship position instead of one frame stale.
+        //
 
-        var shipPosition =
+        let shipPosition =
             gameState.spaceShip.position
-        
-        let terrainSpeed: Float = 12.0
-
-        shipPosition.z += terrainSpeed * Float(dt)
 
         updateShipPosition(
             x: shipPosition.x,
@@ -1466,6 +1457,66 @@ final class TerrainSceneWorld {
         //
         // Therefore camera.worldPosition automatically follows
         // the terrain-following ship.
+        //
+        // Write the terrain-corrected world position (with the real
+        // height-mapped Y) back into GameState so other systems --
+        // shark AI, enemy AI, HUD, etc. -- see the ship's true
+        // rendered altitude instead of a stale Y left over from
+        // whichever scene ran previously.
+
+        gameState.spaceShip.position =
+            shipRoot.position
+
+        // =====================================================================
+        // GAME MANAGERS
+        // =====================================================================
+        //
+        // These remain owned by GameState.
+        //
+        // The renderer does not create or simulate sharks itself.
+        //
+
+        gameState.sharkManager.update(
+            game: gameState,
+            dt: dt
+        )
+
+        // ---------------------------------------------------------------
+        // SHARK TERRAIN FLOOR
+        //
+        // SharkManager's own bounds are tuned for the Ocean scene's
+        // fixed vertical range (-1.5...8) and have no knowledge of the
+        // generated terrain height field, so they cannot keep sharks
+        // above the ground mesh here. Clamp every shark using the
+        // actual terrain height at its own (x, z), so a shark can
+        // never sink below the terrain it's flying over.
+        // ---------------------------------------------------------------
+
+        let sharkTerrainClearance: Float = 0.6
+
+        for shark in gameState.sharks
+        where !shark.destroyed {
+
+            let groundY =
+                terrainHeightAt(
+                    worldX: shark.position.x,
+                    worldZ: shark.position.z
+                )
+
+            let minimumSharkY =
+                groundY + sharkTerrainClearance
+
+            if shark.position.y < minimumSharkY {
+
+                shark.position.y =
+                    minimumSharkY
+            }
+        }
+
+        gameState.asteroidManager.update(
+            game: gameState,
+            dt: dt
+        )
 
         // =====================================================================
         // CANNON
