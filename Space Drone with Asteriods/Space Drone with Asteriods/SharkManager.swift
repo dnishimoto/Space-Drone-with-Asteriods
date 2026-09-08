@@ -475,6 +475,7 @@ final class SharkManager {
             initialDirection
     }
 
+
     // ============================================================
     // UPDATE ALL SHARKS
     // ============================================================
@@ -483,7 +484,6 @@ final class SharkManager {
         game: GameState,
         dt: CGFloat
     ) {
-
         let isTerrain =
             game.currentSection == .terrain
 
@@ -496,9 +496,16 @@ final class SharkManager {
                 continue
             }
 
-            // ====================================================
+            // ========================================================
+            // SAVE SHARK POSITION BEFORE MOVEMENT
+            // ========================================================
+
+            let previousSharkPosition =
+                shark.position
+
+            // ========================================================
             // UPDATE MOVEMENT
-            // ====================================================
+            // ========================================================
 
             updateCellularHunting(
                 shark: shark,
@@ -506,9 +513,9 @@ final class SharkManager {
                 dt: dt
             )
 
-            // ====================================================
+            // ========================================================
             // SCENE BOUNDS
-            // ====================================================
+            // ========================================================
 
             if isTerrain {
 
@@ -523,19 +530,30 @@ final class SharkManager {
                 )
             }
 
-            // ====================================================
-            // FINAL COLLISION CHECK
+            // ========================================================
+            // CURRENT SHARK POSITION
+            // ========================================================
+
+            let currentSharkPosition =
+                shark.position
+
+            // ========================================================
+            // COLLISION RADIUS
             //
-            // This check occurs AFTER movement so a shark cannot
-            // move through the ship and wait until the next frame
-            // to register the collision.
-            // ====================================================
+            // The shark must collide with the actual ship position.
+            //
+            // 2.5 gives the shark a generous physical hit radius.
+            // ========================================================
 
             let collisionRadius: CGFloat = 2.5
 
+            // ========================================================
+            // DIRECT COLLISION CHECK
+            // ========================================================
+
             let distanceToShip =
                 distanceBetween(
-                    shark.position,
+                    currentSharkPosition,
                     shipPosition
                 )
 
@@ -544,10 +562,11 @@ final class SharkManager {
                 print(
                     """
                     [SharkManager] SHARK HIT SHIP
+
                       Shark:
-                        x=\(shark.position.x)
-                        y=\(shark.position.y)
-                        z=\(shark.position.z)
+                        x=\(currentSharkPosition.x)
+                        y=\(currentSharkPosition.y)
+                        z=\(currentSharkPosition.z)
 
                       Ship:
                         x=\(shipPosition.x)
@@ -556,13 +575,240 @@ final class SharkManager {
 
                       Distance:
                         \(distanceToShip)
+
+                      Collision Radius:
+                        \(collisionRadius)
                     """
                 )
 
+                // ====================================================
+                // SHIELD
+                // ====================================================
+
+                if game.shieldActive {
+
+                    shark.destroyed = true
+
+                    game.addPendingExplosion(
+                        x: CGFloat(currentSharkPosition.x),
+                        y: CGFloat(currentSharkPosition.y),
+                        z: CGFloat(currentSharkPosition.z)
+                    )
+
+                    continue
+                }
+
+                // ====================================================
+                // SHIP HIT
+                //
+                // THIS IS THE IMPORTANT FIX.
+                //
+                // Previously the shark was only destroyed.
+                // That allowed the game to continue.
+                //
+                // Now an unshielded shark collision causes GAME OVER.
+                // ====================================================
+
+                game.addPendingExplosion(
+                    x: CGFloat(shipPosition.x),
+                    y: CGFloat(shipPosition.y),
+                    z: CGFloat(shipPosition.z)
+                )
+
                 shark.destroyed = true
+
+                game.gameOver = true
+
+                game.stopFiring()
+
+                print(
+                    "[SharkManager] GAME OVER - SHARK COLLIDED WITH SHIP"
+                )
+
+                return
+            }
+
+            // ========================================================
+            // SWEPT COLLISION CHECK
+            //
+            // This catches a shark that moves from one side of the
+            // ship to the other during a single frame.
+            //
+            // This is important because the shark can move several
+            // units during one update.
+            // ========================================================
+
+            let movementVector = SCNVector3(
+                currentSharkPosition.x -
+                    previousSharkPosition.x,
+
+                currentSharkPosition.y -
+                    previousSharkPosition.y,
+
+                currentSharkPosition.z -
+                    previousSharkPosition.z
+            )
+
+            let movementLength =
+                distanceBetween(
+                    previousSharkPosition,
+                    currentSharkPosition
+                )
+
+            if movementLength > 0.001 {
+
+                let vx =
+                    CGFloat(movementVector.x)
+
+                let vy =
+                    CGFloat(movementVector.y)
+
+                let vz =
+                    CGFloat(movementVector.z)
+
+                let wx =
+                    CGFloat(shipPosition.x) -
+                    CGFloat(previousSharkPosition.x)
+
+                let wy =
+                    CGFloat(shipPosition.y) -
+                    CGFloat(previousSharkPosition.y)
+
+                let wz =
+                    CGFloat(shipPosition.z) -
+                    CGFloat(previousSharkPosition.z)
+
+                let denominator =
+                    vx * vx +
+                    vy * vy +
+                    vz * vz
+
+                var t =
+                    (wx * vx +
+                     wy * vy +
+                     wz * vz) /
+                    denominator
+
+                t =
+                    max(
+                        0.0,
+                        min(
+                            1.0,
+                            t
+                        )
+                    )
+
+                let closestPoint =
+                    SCNVector3(
+                        previousSharkPosition.x +
+                            Float(
+                                vx * t
+                            ),
+
+                        previousSharkPosition.y +
+                            Float(
+                                vy * t
+                            ),
+
+                        previousSharkPosition.z +
+                            Float(
+                                vz * t
+                            )
+                    )
+
+                let sweptDistance =
+                    distanceBetween(
+                        closestPoint,
+                        shipPosition
+                    )
+
+                if sweptDistance <= collisionRadius {
+
+                    print(
+                        """
+                        [SharkManager] SWEPT SHARK HIT SHIP
+
+                          Previous Shark:
+                            x=\(previousSharkPosition.x)
+                            y=\(previousSharkPosition.y)
+                            z=\(previousSharkPosition.z)
+
+                          Current Shark:
+                            x=\(currentSharkPosition.x)
+                            y=\(currentSharkPosition.y)
+                            z=\(currentSharkPosition.z)
+
+                          Ship:
+                            x=\(shipPosition.x)
+                            y=\(shipPosition.y)
+                            z=\(shipPosition.z)
+
+                          Closest Distance:
+                            \(sweptDistance)
+                        """
+                    )
+
+                    // ================================================
+                    // SHIELD
+                    // ================================================
+
+                    if game.shieldActive {
+
+                        shark.destroyed = true
+
+                        game.addPendingExplosion(
+                            x:
+                                CGFloat(
+                                    closestPoint.x
+                                ),
+                            y:
+                                CGFloat(
+                                    closestPoint.y
+                                ),
+                            z:
+                                CGFloat(
+                                    closestPoint.z
+                                )
+                        )
+
+                        continue
+                    }
+
+                    // ================================================
+                    // GAME OVER
+                    // ================================================
+
+                    game.addPendingExplosion(
+                        x:
+                            CGFloat(
+                                shipPosition.x
+                            ),
+                        y:
+                            CGFloat(
+                                shipPosition.y
+                            ),
+                        z:
+                            CGFloat(
+                                shipPosition.z
+                            )
+                    )
+
+                    shark.destroyed = true
+
+                    game.gameOver = true
+
+                    game.stopFiring()
+
+                    print(
+                        "[SharkManager] GAME OVER - SWEPT SHARK COLLISION"
+                    )
+
+                    return
+                }
             }
         }
     }
+
 
     // ============================================================
     // CELLULAR HUNTING
