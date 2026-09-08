@@ -86,6 +86,8 @@ struct SpaceShip {
 
     /// Total tunnel progress.
     var progress: CGFloat = 0.0
+    
+    private var terrainBaseY: CGFloat = 0.0
 
 
     // MARK: - Tunnel Update
@@ -302,22 +304,42 @@ struct SpaceShip {
         )
 
         // ============================================================
-        // FORWARD PROGRESS
+        // UP / DOWN
         // ============================================================
         //
-        // Unconditional: the ship advances along Z every frame this
-        // mode runs, regardless of joystick input, exactly like the
-        // tunnel/ocean modes advance forward on their own. Unlike
-        // those modes (which reset position.z to 0 every frame and
-        // track forward motion separately), the terrain ship's Z IS
-        // its real world Z: TerrainSceneWorld reads position.x/z
-        // every frame to sample terrain height and recycle terrain
-        // segments, so it must be persisted here, not reset.
+        // verticalInput:
         //
-        // Uses the same `forwardSpeed` the rest of the ship already
-        // uses for lasers/asteroids/score, so terrain motion can't
-        // silently drift out of sync with those systems.
+        //     +1 = up
+        //      0 = neutral
+        //     -1 = down
         //
+        // Keep the vertical position independent from the terrain's
+        // base height. This prevents TerrainSceneWorld from forcing
+        // the ship back to the terrain surface every frame.
+        //
+        // ============================================================
+
+        let verticalSpeed: CGFloat = 12.0
+
+        var worldY =
+            CGFloat(position.y) +
+            verticalInput *
+            verticalSpeed *
+            dt
+
+        // Keep the ship above the terrain.
+
+        let minimumTerrainClearance: CGFloat = 2.0
+
+        worldY = max(
+            terrainBaseY + minimumTerrainClearance,
+            worldY
+        )
+
+        // ============================================================
+        // FORWARD PROGRESS
+        // ============================================================
+
         let worldZ =
             CGFloat(position.z) +
             forwardSpeed *
@@ -332,20 +354,14 @@ struct SpaceShip {
         // ============================================================
         // FINAL WORLD POSITION
         // ============================================================
-        //
-        // Y is deliberately left as whatever it already is here.
-        // TerrainSceneWorld overwrites it from the real terrain
-        // height immediately after calling this, then writes the
-        // corrected position back into GameState.
-        //
+
         position = SCNVector3(
             Float(worldX),
-            position.y,
+            Float(worldY),
             Float(worldZ)
         )
 
-        verticalPosition =
-            CGFloat(position.y)
+        verticalPosition = worldY
     }
 
 

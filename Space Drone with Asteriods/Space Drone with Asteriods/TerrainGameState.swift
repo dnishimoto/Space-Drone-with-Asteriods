@@ -1,55 +1,27 @@
-
 import Foundation
 import SceneKit
-
-// =============================================================================
-// TERRAIN GAME STATE
-// =============================================================================
-//
-// Gameplay coordinator for the terrain scene.
-//
-// Responsibilities:
-//   • Update terrain-scene gameplay every frame
-//   • Keep terrain scene synchronized with GameState
-//   • Update sharks
-//   • Update enemy spaceship
-//   • Provide a single terrain-scene update entry point
-//
-// Terrain mesh generation itself belongs to TerrainSceneWorld.
-//
-// Coordinate system:
-//
-//   X = left / right
-//   Y = up
-//   Z = forward
-//
-// =============================================================================
 
 @MainActor
 enum TerrainGameState {
 
-    // =========================================================================
-    // MARK: - Configuration
-    // =========================================================================
+    // =====================================================================
+    // ACTIVATION / COLLISION CONSTANTS
+    // =====================================================================
 
-    /// Maximum distance at which sharks are actively considered.
     private static let sharkActivationDistance: Float = 180.0
-
-    /// Maximum distance at which the enemy spaceship is actively considered.
     private static let enemyActivationDistance: Float = 300.0
 
-    /// Distance behind the player at which an entity can be recycled.
-    private static let recycleDistance: Float = 100.0
+    private static let sharkCollisionRadius: Float = 2.7
+    private static let laserCollisionRadius: Float = 1.5
 
-    // =========================================================================
-    // MARK: - Main Update
-    // =========================================================================
+    // =====================================================================
+    // MAIN UPDATE
+    // =====================================================================
 
     static func update(
         gameState: GameState,
         dt: CGFloat
     ) {
-
         guard dt > 0 else {
             return
         }
@@ -61,26 +33,15 @@ enum TerrainGameState {
             )
         )
 
-        // =====================================================================
-        // 1. Update terrain
-        // =====================================================================
-        //
-        // TerrainSceneWorld owns the procedural terrain.
-        //
-        // GameState should provide the player's world position.
-        //
-        // If your GameState uses a different property name for the player
-        // position, change only the two values below.
-        //
-        // =====================================================================
-
+        // The Starship position is the authoritative terrain-game
+        // world position.
         let playerPosition = playerWorldPosition(
             from: gameState
         )
 
-        // =====================================================================
-        // 2. Update sharks
-        // =====================================================================
+        // -------------------------------------------------------------
+        // SHARKS
+        // -------------------------------------------------------------
 
         updateSharks(
             gameState: gameState,
@@ -88,9 +49,9 @@ enum TerrainGameState {
             dt: deltaTime
         )
 
-        // =====================================================================
-        // 3. Update enemy spaceship
-        // =====================================================================
+        // -------------------------------------------------------------
+        // ENEMY SHIP
+        // -------------------------------------------------------------
 
         updateEnemyShip(
             gameState: gameState,
@@ -98,9 +59,9 @@ enum TerrainGameState {
             dt: deltaTime
         )
 
-        // =====================================================================
-        // 4. Update gameplay AI
-        // =====================================================================
+        // -------------------------------------------------------------
+        // OTHER AI
+        // -------------------------------------------------------------
 
         updateAI(
             gameState: gameState,
@@ -108,57 +69,29 @@ enum TerrainGameState {
             dt: deltaTime
         )
 
-        // =====================================================================
-        // 5. Check collisions
-        // =====================================================================
+        // -------------------------------------------------------------
+        // COLLISIONS / SHARK RECYCLING
+        // -------------------------------------------------------------
 
         checkCollisions(
             gameState: gameState
         )
     }
 
-    // =========================================================================
-    // MARK: - Player Position
-    // =========================================================================
+    // =====================================================================
+    // PLAYER WORLD POSITION
+    // =====================================================================
 
     private static func playerWorldPosition(
         from gameState: GameState
     ) -> SCNVector3 {
 
-        // ---------------------------------------------------------------------
-        // IMPORTANT
-        // ---------------------------------------------------------------------
-        //
-        // Replace this with the actual player/ship world-position property
-        // from your GameState if it has a different name.
-        //
-        // The preferred architecture is for GameState to maintain the
-        // authoritative player world position.
-        //
-        // ---------------------------------------------------------------------
-
-        if let ship = gameState.enemySpaceShip {
-            // This is intentionally NOT used as the player's position.
-            // enemySpaceShip belongs to the enemy.
-            _ = ship
-        }
-
-        // Until GameState exposes the player position directly, the terrain
-        // scene begins at the origin.
-        //
-        // This fallback keeps the file compiling without inventing a
-        // GameState property that may not exist in your project.
-
-        return SCNVector3(
-            0,
-            0,
-            0
-        )
+        return gameState.spaceShip.position
     }
 
-    // =========================================================================
-    // MARK: - Sharks
-    // =========================================================================
+    // =====================================================================
+    // SHARK UPDATE
+    // =====================================================================
 
     private static func updateSharks(
         gameState: GameState,
@@ -166,25 +99,20 @@ enum TerrainGameState {
         dt: Float
     ) {
 
-        // ---------------------------------------------------------------------
-        // Sharks should be represented by GameState's shark collection once
-        // that collection is connected to the terrain scene.
+        // Shark movement is handled by SharkManager / TerrainSceneWorld.
         //
-        // The TerrainSceneWorld owns the visible shark nodes.
-        // GameState owns gameplay state.
-        //
-        // This method is therefore intentionally safe until your GameState
-        // exposes its shark collection.
-        // ---------------------------------------------------------------------
+        // This function remains here as the terrain-game update hook so
+        // that shark-specific game-state behavior can be added without
+        // moving the actual cellular-automaton movement system here.
 
         _ = gameState
         _ = playerPosition
         _ = dt
     }
 
-    // =========================================================================
-    // MARK: - Enemy Spaceship
-    // =========================================================================
+    // =====================================================================
+    // ENEMY SHIP UPDATE
+    // =====================================================================
 
     private static func updateEnemyShip(
         gameState: GameState,
@@ -192,27 +120,18 @@ enum TerrainGameState {
         dt: Float
     ) {
 
-        guard let enemy =
-                gameState.enemySpaceShip
-        else {
+        guard let enemy = gameState.enemySpaceShip else {
             return
         }
-
-        // ---------------------------------------------------------------------
-        // The enemy ship remains a GameState-owned gameplay entity.
-        //
-        // Its actual movement/AI can be added here once the EnemySpaceShip
-        // interface is known.
-        // ---------------------------------------------------------------------
 
         _ = enemy
         _ = playerPosition
         _ = dt
     }
 
-    // =========================================================================
-    // MARK: - Smart AI
-    // =========================================================================
+    // =====================================================================
+    // AI UPDATE
+    // =====================================================================
 
     private static func updateAI(
         gameState: GameState,
@@ -220,51 +139,34 @@ enum TerrainGameState {
         dt: Float
     ) {
 
-        // ---------------------------------------------------------------------
-        // This is the common AI entry point.
-        //
-        // Future behavior can include:
-        //
-        //   • Shark interception
-        //   • Enemy spaceship pursuit
-        //   • Terrain-aware flight
-        //   • Avoidance of mountains
-        //   • Attack runs
-        //   • Predictive targeting
-        //   • Separation between multiple sharks
-        //
-        // ---------------------------------------------------------------------
-
         _ = gameState
         _ = playerPosition
         _ = dt
     }
 
-    // =========================================================================
-    // MARK: - Collisions
-    // =========================================================================
+    // =====================================================================
+    // COLLISIONS
+    // =====================================================================
 
     private static func checkCollisions(
         gameState: GameState
     ) {
 
-        // ---------------------------------------------------------------
-        // PLAYER LASERS → SHARKS
-        //
-        // This scene previously had no collision detection at all --
-        // TerrainSceneWorld.sync() never called any check, so player
-        // lasers passed straight through sharks. Mirrors the same
-        // laser-vs-shark distance check OceanGameState already uses.
-        // ---------------------------------------------------------------
+        // ================================================================
+        // PLAYER POSITION
+        // ================================================================
 
-        var sharksToRemove: [Shark] = []
+        let shipPosition = gameState.spaceShip.position
 
-        let collisionRadius: Float = 0.5
+        // ================================================================
+        // LASER → SHARK COLLISION
+        // ================================================================
+
+        var sharksHitByLasers: [Shark] = []
 
         for laser in gameState.playerLasers {
 
-            let laserPosition =
-                laser.worldPosition()
+            let laserPosition = laser.worldPosition()
 
             for shark in gameState.sharks {
 
@@ -272,22 +174,20 @@ enum TerrainGameState {
                     continue
                 }
 
-                if sharksToRemove.contains(
+                if sharksHitByLasers.contains(
                     where: { $0 === shark }
                 ) {
                     continue
                 }
 
-                let sharkPosition =
-                    shark.position
+                let sharkPosition = shark.position
 
-                let collisionDistance =
-                    distance(
-                        from: laserPosition,
-                        to: sharkPosition
-                    )
+                let collisionDistance = distance(
+                    from: laserPosition,
+                    to: sharkPosition
+                )
 
-                if collisionDistance <= collisionRadius {
+                if collisionDistance <= laserCollisionRadius {
 
                     shark.destroyed = true
 
@@ -300,25 +200,181 @@ enum TerrainGameState {
                         scale: 1.0
                     )
 
-                    sharksToRemove.append(shark)
+                    sharksHitByLasers.append(shark)
 
-                    // This laser has hit something.
                     break
                 }
             }
         }
 
-        for shark in sharksToRemove {
+        // ================================================================
+        // REMOVE LASER-DESTROYED SHARKS
+        // ================================================================
 
-            gameState.sharks.removeAll {
-                $0 === shark
+        if !sharksHitByLasers.isEmpty {
+
+            gameState.sharks.removeAll { shark in
+
+                sharksHitByLasers.contains { candidate in
+                    candidate === shark
+                }
             }
+        }
+
+        // ================================================================
+        // DO NOT PROCESS SHARK COLLISIONS AFTER GAME OVER
+        // ================================================================
+
+        guard !gameState.gameOver else {
+            return
+        }
+
+        // ================================================================
+        // SHARK → PLAYER COLLISION
+        // ================================================================
+        //
+        // IMPORTANT:
+        //
+        // The collision is checked BEFORE the behind-player test.
+        //
+        // This prevents a fast-moving shark from crossing from:
+        //
+        //     shark.z > ship.z
+        //
+        // to:
+        //
+        //     shark.z < ship.z
+        //
+        // in one frame and being deleted without triggering game over.
+        //
+        // ================================================================
+
+        var sharksBehindPlayer: [Shark] = []
+
+        for shark in gameState.sharks {
+
+            if shark.destroyed {
+                continue
+            }
+
+            let sharkPosition = shark.position
+
+            // ------------------------------------------------------------
+            // FULL 3D COLLISION
+            // ------------------------------------------------------------
+
+            let collisionDistance = distance(
+                from: sharkPosition,
+                to: shipPosition
+            )
+
+            print(
+                "[TerrainGame] Shark distance=" +
+                "\(collisionDistance) " +
+                "shark=(" +
+                "\(sharkPosition.x), " +
+                "\(sharkPosition.y), " +
+                "\(sharkPosition.z)" +
+                ") " +
+                "ship=(" +
+                "\(shipPosition.x), " +
+                "\(shipPosition.y), " +
+                "\(shipPosition.z)" +
+                ")"
+            )
+
+            // ------------------------------------------------------------
+            // SHARK HIT SHIP
+            // ------------------------------------------------------------
+
+            if collisionDistance <= sharkCollisionRadius {
+
+                print(
+                    "[TerrainGame] GAME OVER — Shark hit ship " +
+                    "distance=\(collisionDistance) " +
+                    "shark=(" +
+                    "\(sharkPosition.x), " +
+                    "\(sharkPosition.y), " +
+                    "\(sharkPosition.z)" +
+                    ") " +
+                    "ship=(" +
+                    "\(shipPosition.x), " +
+                    "\(shipPosition.y), " +
+                    "\(shipPosition.z)" +
+                    ")"
+                )
+
+                shark.destroyed = true
+
+                gameState.gameOver = true
+
+                break
+            }
+
+            // ------------------------------------------------------------
+            // SHARK IS CLEARLY BEHIND PLAYER
+            // ------------------------------------------------------------
+            //
+            // Only recycle the shark after it is more than the collision
+            // radius behind the ship.
+            //
+            // This gives the collision test a small safety margin.
+            //
+            // ------------------------------------------------------------
+
+            if sharkPosition.z < shipPosition.z - sharkCollisionRadius {
+
+                shark.destroyed = true
+
+                sharksBehindPlayer.append(shark)
+
+                print(
+                    "[TerrainGame] Shark removed behind player " +
+                    "sharkZ=\(sharkPosition.z) " +
+                    "shipZ=\(shipPosition.z)"
+                )
+            }
+        }
+
+        // ================================================================
+        // REMOVE SHARKS THAT PASSED BEHIND PLAYER
+        // ================================================================
+
+        if !sharksBehindPlayer.isEmpty {
+
+            gameState.sharks.removeAll { shark in
+
+                sharksBehindPlayer.contains { candidate in
+                    candidate === shark
+                }
+            }
+        }
+
+        // ================================================================
+        // REMOVE THE SHARK THAT CAUSED GAME OVER
+        // ================================================================
+
+        if gameState.gameOver {
+
+            gameState.sharks.removeAll { shark in
+                shark.destroyed
+            }
+
+            return
+        }
+
+        // ================================================================
+        // FINAL DESTROYED-SHARK CLEANUP
+        // ================================================================
+
+        gameState.sharks.removeAll { shark in
+            shark.destroyed
         }
     }
 
-    // =========================================================================
-    // MARK: - Distance Helper
-    // =========================================================================
+    // =====================================================================
+    // 3D DISTANCE
+    // =====================================================================
 
     private static func distance(
         from a: SCNVector3,
@@ -336,9 +392,9 @@ enum TerrainGameState {
         )
     }
 
-    // =========================================================================
-    // MARK: - Direction Helper
-    // =========================================================================
+    // =====================================================================
+    // NORMALIZED 3D DIRECTION
+    // =====================================================================
 
     private static func normalizedDirection(
         from source: SCNVector3,
@@ -349,14 +405,14 @@ enum TerrainGameState {
         let dy = target.y - source.y
         let dz = target.z - source.z
 
-        let length =
-            sqrt(
-                dx * dx +
-                dy * dy +
-                dz * dz
-            )
+        let length = sqrt(
+            dx * dx +
+            dy * dy +
+            dz * dz
+        )
 
         guard length > 0.0001 else {
+
             return SCNVector3(
                 0,
                 0,
@@ -371,9 +427,9 @@ enum TerrainGameState {
         )
     }
 
-    // =========================================================================
-    // MARK: - Move Toward Target
-    // =========================================================================
+    // =====================================================================
+    // MOVE NODE TOWARD TARGET
+    // =====================================================================
 
     private static func move(
         node: SCNNode,
@@ -382,24 +438,24 @@ enum TerrainGameState {
         dt: Float
     ) {
 
-        let direction =
-            normalizedDirection(
-                from: node.presentation.worldPosition,
-                to: target
-            )
+        let direction = normalizedDirection(
+            from: node.presentation.worldPosition,
+            to: target
+        )
 
-        let movement =
-            speed * dt
+        let movement = speed * dt
 
-        let current =
-            node.position
+        let current = node.position
 
-        node.position =
-            SCNVector3(
-                current.x + direction.x * movement,
-                current.y + direction.y * movement,
-                current.z + direction.z * movement
-            )
+        node.position = SCNVector3(
+            current.x +
+                direction.x * movement,
+
+            current.y +
+                direction.y * movement,
+
+            current.z +
+                direction.z * movement
+        )
     }
 }
-

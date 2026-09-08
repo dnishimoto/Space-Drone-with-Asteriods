@@ -11,11 +11,17 @@
 import Foundation
 import SceneKit
 
-// Optional protocol for providing ship Y position, for potential future refactoring
+// ============================================================
+// OPTIONAL SHIP POSITION PROVIDER
+// ============================================================
+
 protocol ShipPositionProvider {
     var shipPositionY: CGFloat { get }
 }
-// Note: This protocol can be adopted for more robust ship position access if needed in the future.
+
+// ============================================================
+// SHARK MANAGER
+// ============================================================
 
 @MainActor
 final class SharkManager {
@@ -25,14 +31,14 @@ final class SharkManager {
     // ============================================================
 
     private var spawnClock: CGFloat = 0.0
-    private let spawnInterval: CGFloat = 10.8
+    private let spawnInterval: CGFloat = 5.8
 
     // ============================================================
     // SHARK BEHAVIOR
     // ============================================================
 
-    private let minimumSpawnDistance: CGFloat = 35.0
-    private let maximumSpawnDistance: CGFloat = 65.0
+    private let minimumSpawnDistance: CGFloat = 65.0
+    private let maximumSpawnDistance: CGFloat = 95.0
 
     private let minimumSpeed: CGFloat = 0.5
     private let maximumSpeed: CGFloat = 2.0
@@ -60,46 +66,35 @@ final class SharkManager {
     // ============================================================
     // TERRAIN BOUNDS
     // ============================================================
+    //
+    // IMPORTANT:
+    //
+    // X is bounded because the terrain has a finite width.
+    //
+    // Z IS NOT BOUNDED.
+    //
+    // The terrain extends forward with the ship, so sharks must
+    // be able to travel continuously along Z.
+    //
+    // ============================================================
 
     private let minimumTerrainX: CGFloat = -36.0
     private let maximumTerrainX: CGFloat = 36.0
 
+    // Retained for compatibility.
+    // These are NOT used as terrain movement limits.
     private let minimumTerrainY: CGFloat = 0.0
     private let maximumTerrainY: CGFloat = 40.0
 
     // ============================================================
     // TERRAIN SHARK CLEARANCE
     // ============================================================
-    //
-    // Sharks must never be allowed to occupy the terrain surface.
-    //
-    // The terrain-height provider returns the actual terrain Y
-    // coordinate for the shark's X/Z position.
-    //
-    // The shark is maintained this distance above the terrain.
-    //
-    // ============================================================
 
     private let terrainSharkClearance: CGFloat = 3.5
-
-    // Fallback terrain surface when TerrainSceneWorld has not
-    // supplied an actual terrain-height function.
     private let fallbackTerrainHeight: CGFloat = 0.0
 
     // ============================================================
     // TERRAIN HEIGHT PROVIDER
-    // ============================================================
-    //
-    // TerrainSceneWorld can provide its actual generated terrain
-    // height through this closure.
-    //
-    // Input:
-    //     x = world X
-    //     z = world Z
-    //
-    // Return:
-    //     terrain surface Y
-    //
     // ============================================================
 
     private var terrainHeightProvider:
@@ -111,17 +106,41 @@ final class SharkManager {
 
     private let cellSize: CGFloat = 2.0
     private let cellularStepTime: CGFloat = 0.20
-    private let huntingRange: CGFloat = 100.0
+    private let huntingRange: CGFloat = 200.0
     private let randomMovementProbability: CGFloat = 0.04
 
     // ============================================================
     // TERRAIN FEEDING FRENZY
     // ============================================================
 
-    private let frenzyRange: CGFloat = 100.0
-    private let attackRange: CGFloat = 20.0
-    private let swarmRadius: CGFloat = 18.0
+    private let frenzyRange: CGFloat = 200.0
+    private let attackRange: CGFloat = 50.0
+    private let swarmRadius: CGFloat = 58.0
     private let sharkSeparationRadius: CGFloat = 3.0
+
+    // ============================================================
+    // CELLULAR ATTACK RADII
+    // ============================================================
+
+    private let hardPursuitRadius: CGFloat = 50.0
+    private let convergenceRadius: CGFloat = 45.0
+    private let pursuitRadius: CGFloat = 60.0
+
+    // ============================================================
+    // VERTICAL ATTACK CONTROL
+    // ============================================================
+    //
+    // These values control how strongly the cellular automaton
+    // responds to the ship's vertical position.
+    //
+    // A positive vertical error means the ship is above the shark.
+    //
+    // A negative vertical error means the ship is below the shark.
+    //
+    // ============================================================
+
+    private let verticalAttackDistance: CGFloat = 8.0
+    private let verticalAttackWeight: CGFloat = 1.0
 
     // ============================================================
     // CELLULAR STATE
@@ -176,6 +195,10 @@ final class SharkManager {
         dt: CGFloat
     ) {
 
+        guard dt.isFinite, dt > 0.0 else {
+            return
+        }
+
         updateSpawning(
             game: game,
             dt: dt
@@ -208,20 +231,24 @@ final class SharkManager {
 
         spawnClock = 0.0
 
-        let isTerrain = game.currentSection == .terrain
+        let isTerrain =
+            game.currentSection == .terrain
 
         if isTerrain {
-            for _ in 0..<3 {
-                spawnShark(game: game)
+
+            for _ in 0..<20 {
+                spawnShark(
+                    game: game
+                )
             }
+
         } else {
-            spawnShark(game: game)
+
+            spawnShark(
+                game: game
+            )
         }
     }
-
-    // ============================================================
-    // SPAWN SHARK
-    // ============================================================
 
     // ============================================================
     // SPAWN SHARK
@@ -240,10 +267,6 @@ final class SharkManager {
         let shipZ =
             CGFloat(shipPosition.z)
 
-        // ========================================================
-        // DETERMINE SCENE
-        // ========================================================
-
         let isTerrain =
             game.currentSection == .terrain
 
@@ -251,13 +274,22 @@ final class SharkManager {
         // RANDOM X
         // ========================================================
 
-        let spawnX =
-            CGFloat.random(
+        let spawnX: CGFloat
+
+        if isTerrain {
+
+            spawnX = CGFloat.random(
                 in:
-                    isTerrain
-                    ? minimumTerrainX...maximumTerrainX
-                    : minimumOceanX...maximumOceanX
+                    minimumTerrainX...maximumTerrainX
             )
+
+        } else {
+
+            spawnX = CGFloat.random(
+                in:
+                    minimumOceanX...maximumOceanX
+            )
+        }
 
         // ========================================================
         // SPAWN DISTANCE
@@ -280,20 +312,16 @@ final class SharkManager {
             spawnDistance
 
         // ========================================================
-        // RANDOM Y
+        // SPAWN Y
         // ========================================================
 
         let spawnY: CGFloat
 
         if isTerrain {
 
-            // IMPORTANT:
-            //
-            // Sample the terrain at the shark's ACTUAL
-            // X/Z spawn position.
-            //
-            // Previously this used shipZ, which meant the
-            // terrain check was performed at the wrong location.
+            // ====================================================
+            // SAMPLE TERRAIN AT ACTUAL SHARK LOCATION
+            // ====================================================
 
             let terrainY =
                 terrainHeight(
@@ -301,12 +329,16 @@ final class SharkManager {
                     z: spawnZ
                 )
 
-            // Keep the shark above the actual terrain
-            // and also above the ship's vertical region.
-
             let terrainMinimumY =
                 terrainY +
                 terrainSharkClearance
+
+            // ====================================================
+            // SPAWN ABOVE THE SHIP'S CURRENT HEIGHT
+            //
+            // This prevents terrain sharks from initially spawning
+            // underneath the ship.
+            // ====================================================
 
             let shipMinimumY =
                 shipY +
@@ -314,7 +346,11 @@ final class SharkManager {
                     in: 1.0...6.0
                 )
 
-            spawnY = terrainMinimumY
+            spawnY =
+                max(
+                    terrainMinimumY,
+                    shipMinimumY
+                )
 
         } else {
 
@@ -326,7 +362,7 @@ final class SharkManager {
         }
 
         // ========================================================
-        // CREATE SHARK
+        // INITIAL ANGLE
         // ========================================================
 
         let angle =
@@ -334,6 +370,10 @@ final class SharkManager {
                 spawnY,
                 spawnX
             )
+
+        // ========================================================
+        // CREATE SHARK
+        // ========================================================
 
         let shark =
             Shark(
@@ -343,39 +383,54 @@ final class SharkManager {
                         Float(spawnY),
                         Float(spawnZ)
                     ),
-
                 lateralAngle:
                     angle,
-
                 animPhase:
                     Float.random(
                         in:
-                            0...(Float.pi * 2.0)
+                            0.0...(Float.pi * 2.0)
                     ),
-
                 destroyed:
                     false,
-
                 forwardSpeed:
                     CGFloat.random(
                         in:
                             minimumSpeed...maximumSpeed
-                ),
-
+                    ),
                 lateralSpeed:
                     CGFloat.random(
                         in:
                             minimumLateralSpeed...maximumLateralSpeed
-                ),
-
+                    ),
                 z:
                     spawnZ
             )
 
-        let actualTerrainY = terrainHeight(
-            x: CGFloat(shark.position.x),
-            z: CGFloat(shark.position.z)
-        )
+        // ========================================================
+        // FINAL TERRAIN CLEARANCE
+        // ========================================================
+
+        if isTerrain {
+            enforceTerrainClearance(
+                shark: shark
+            )
+        }
+
+        // ========================================================
+        // DEBUG INFORMATION
+        // ========================================================
+
+        let actualTerrainY =
+            terrainHeight(
+                x:
+                    CGFloat(
+                        shark.position.x
+                    ),
+                z:
+                    CGFloat(
+                        shark.position.z
+                    )
+            )
 
         print(
             """
@@ -388,19 +443,6 @@ final class SharkManager {
               Terrain section: \(isTerrain)
             """
         )
-        // ========================================================
-        // FINAL TERRAIN SAFETY CHECK
-        //
-        // This performs one final check using the shark's
-        // actual position before putting it into the game.
-        // =============== =========================================
-
-        if isTerrain {
-
-            enforceTerrainClearance(
-                shark: shark
-            )
-        }
 
         // ========================================================
         // ADD SHARK
@@ -411,7 +453,7 @@ final class SharkManager {
         )
 
         // ========================================================
-        // CELLULAR STATE
+        // INITIAL CELLULAR STATE
         // ========================================================
 
         let id =
@@ -419,27 +461,22 @@ final class SharkManager {
                 shark
             )
 
-        cellularTimers[id] =
-            0.0
+        cellularTimers[id] = 0.0
 
-        // ========================================================
-        // INITIAL DIRECTION
-        // ========================================================
-
-        let direction =
+        let initialDirection =
             directionToShip(
                 sharkPosition:
                     shark.position,
-
                 shipPosition:
                     shipPosition
             )
 
         cellularDirections[id] =
-            direction
+            initialDirection
     }
+
     // ============================================================
-    // SHARK BEHAVIOR
+    // UPDATE ALL SHARKS
     // ============================================================
 
     private func updateSharks(
@@ -450,31 +487,17 @@ final class SharkManager {
         let isTerrain =
             game.currentSection == .terrain
 
+        let shipPosition =
+            game.spaceShip.position
+
         for shark in game.sharks {
-
-            // --- SHARK-SHIP COLLISION CHECK ---
-            // If a shark gets within collisionRadius of the ship, end the game.
-
-            let collisionRadius: CGFloat = 2.5
-            let shipPosition = game.spaceShip.position
-            let distanceToShip = distanceBetween(shark.position, shipPosition)
-            if !shark.destroyed && distanceToShip <= collisionRadius {
-                print("*** SHARK HIT SHIP *** [SharkManager] Shark at x=\(shark.position.x), y=\(shark.position.y), z=\(shark.position.z) collided with ship at x=\(shipPosition.x), y=\(shipPosition.y), z=\(shipPosition.z)")
-                // End game logic here. If GameState has an endGame(reason:) or similar, call it:
-                // Example (uncomment and adapt if available):
-                // game.endGame(reason: "shark_collision")
-                // If no such method exists, insert your own game-over logic here.
-
-                // Optionally, mark shark as destroyed if you want it removed immediately
-                shark.destroyed = true
-            }
 
             guard !shark.destroyed else {
                 continue
             }
 
             // ====================================================
-            // PRIMARY MOVEMENT SYSTEM
+            // UPDATE MOVEMENT
             // ====================================================
 
             updateCellularHunting(
@@ -484,7 +507,7 @@ final class SharkManager {
             )
 
             // ====================================================
-            // SCENE BOUNDARIES
+            // SCENE BOUNDS
             // ====================================================
 
             if isTerrain {
@@ -498,6 +521,45 @@ final class SharkManager {
                 applyOceanBounds(
                     shark: shark
                 )
+            }
+
+            // ====================================================
+            // FINAL COLLISION CHECK
+            //
+            // This check occurs AFTER movement so a shark cannot
+            // move through the ship and wait until the next frame
+            // to register the collision.
+            // ====================================================
+
+            let collisionRadius: CGFloat = 2.5
+
+            let distanceToShip =
+                distanceBetween(
+                    shark.position,
+                    shipPosition
+                )
+
+            if distanceToShip <= collisionRadius {
+
+                print(
+                    """
+                    [SharkManager] SHARK HIT SHIP
+                      Shark:
+                        x=\(shark.position.x)
+                        y=\(shark.position.y)
+                        z=\(shark.position.z)
+
+                      Ship:
+                        x=\(shipPosition.x)
+                        y=\(shipPosition.y)
+                        z=\(shipPosition.z)
+
+                      Distance:
+                        \(distanceToShip)
+                    """
+                )
+
+                shark.destroyed = true
             }
         }
     }
@@ -513,104 +575,32 @@ final class SharkManager {
     ) {
 
         let id =
-            ObjectIdentifier(shark)
+            ObjectIdentifier(
+                shark
+            )
 
         var timer =
             cellularTimers[id] ?? 0.0
 
         timer += dt
 
-        let isTerrain =
-            game.currentSection == .terrain
+        let shipPosition =
+            game.spaceShip.position
+
+        let distanceToShip =
+            distanceBetween(
+                shark.position,
+                shipPosition
+            )
 
         // ========================================================
-        // TERRAIN FEEDING FRENZY
+        // TERRAIN CELLULAR HUNTING
         // ========================================================
 
-        if isTerrain {
-
-            let direction =
-                feedingFrenzyDirection(
-                    shark: shark,
-                    game: game
-                )
-
-            cellularDirections[id] =
-                direction
-
-            let distance =
-                distanceBetween(
-                    shark.position,
-                    game.spaceShip.position
-                )
+        if game.currentSection == .terrain {
 
             // ====================================================
-            // FRENZY FACTOR
-            // ====================================================
-
-            let frenzyFactor =
-                max(
-                    0.0,
-                    min(
-                        1.0,
-                        1.0 -
-                        distance /
-                        frenzyRange
-                    )
-                )
-
-            // ====================================================
-            // BASE SPEED
-            // ====================================================
-
-            let baseSpeed =
-                max(
-                    shark.forwardSpeed,
-                    minimumSpeed
-                )
-
-            // ====================================================
-            // FRENZY SPEED
-            // ====================================================
-
-            let frenzySpeed =
-                minimumHuntSpeed +
-                (
-                    maximumHuntSpeed -
-                    minimumHuntSpeed
-                ) *
-                frenzyFactor
-
-            let movementSpeed =
-                max(
-                    baseSpeed,
-                    frenzySpeed
-                )
-
-            let distanceStep =
-                Float(
-                    movementSpeed *
-                    dt
-                )
-
-            // ====================================================
-            // MOVE IN 3D
-            // ====================================================
-
-            shark.position.x +=
-                direction.x *
-                distanceStep
-
-            shark.position.y +=
-                direction.y *
-                distanceStep
-
-            shark.position.z +=
-                direction.z *
-                distanceStep
-
-            // ====================================================
-            // CELLULAR STATE UPDATE
+            // UPDATE CELLULAR DECISION
             // ====================================================
 
             if timer >= cellularStepTime {
@@ -624,46 +614,168 @@ final class SharkManager {
                     )
             }
 
-            cellularTimers[id] =
-                timer
+            // ====================================================
+            // GET CURRENT CELLULAR DIRECTION
+            // ====================================================
+
+            let cellularDirection =
+                cellularDirections[id]
+                ?? directionToShip(
+                    sharkPosition:
+                        shark.position,
+                    shipPosition:
+                        shipPosition
+                )
 
             // ====================================================
-            // CRITICAL TERRAIN SAFETY
+            // ALWAYS APPLY CURRENT 3D ATTACK CORRECTION
+            //
+            // This is important.
+            //
+            // The cellular direction is allowed to determine
+            // local movement, but the ship remains the target.
+            //
+            // This prevents the shark from selecting a cellular
+            // direction that causes it to pass underneath or
+            // above the ship.
             // ====================================================
+
+            let finalDirection =
+                attackCorrectedDirection(
+                    cellularDirection:
+                        cellularDirection,
+                    sharkPosition:
+                        shark.position,
+                    shipPosition:
+                        shipPosition,
+                    distanceToShip:
+                        distanceToShip
+                )
+
+            // ====================================================
+            // FRENZY FACTOR
+            // ====================================================
+
+            let frenzyFactor =
+                max(
+                    0.0,
+                    min(
+                        1.0,
+                        1.0 -
+                        distanceToShip /
+                        frenzyRange
+                    )
+                )
+
+            // ====================================================
+            // SPEED
+            // ====================================================
+
+            let baseSpeed =
+                max(
+                    shark.forwardSpeed,
+                    minimumSpeed
+                )
+
+            let huntSpeed =
+                minimumHuntSpeed +
+                (
+                    maximumHuntSpeed -
+                    minimumHuntSpeed
+                ) *
+                frenzyFactor
+
+            let movementSpeed =
+                max(
+                    baseSpeed,
+                    huntSpeed
+                )
+
+            let distanceStep =
+                Float(
+                    movementSpeed *
+                    dt
+                )
+
+            // ====================================================
+            // MOVE X
+            // ====================================================
+
+            shark.position.x +=
+                finalDirection.x *
+                distanceStep
+
+            // ====================================================
+            // MOVE Y
             //
-            // Movement can carry a shark below a hill or terrain
-            // surface between cellular updates.
-            //
-            // Clamp immediately after movement.
-            //
+            // This is the important vertical attack movement.
+            // ====================================================
+
+            shark.position.y +=
+                finalDirection.y *
+                distanceStep
+
+            // ====================================================
+            // MOVE Z
+            // ====================================================
+
+            shark.position.z +=
+                finalDirection.z *
+                distanceStep
+
+            // ====================================================
+            // TERRAIN CLEARANCE
             // ====================================================
 
             enforceTerrainClearance(
                 shark: shark
             )
 
+            cellularTimers[id] =
+                timer
+
             return
         }
 
         // ========================================================
-        // OCEAN HUNTING
+        // OCEAN CELLULAR HUNTING
         // ========================================================
 
-        var direction =
+        if timer >= cellularStepTime {
+
+            timer = 0.0
+
+            cellularDirections[id] =
+                chooseNextCellularDirection(
+                    shark: shark,
+                    game: game
+                )
+        }
+
+        let cellularDirection =
             cellularDirections[id]
-            ??
+            ?? directionToShip(
+                sharkPosition:
+                    shark.position,
+                shipPosition:
+                    shipPosition
+            )
+
+        // ========================================================
+        // DIRECT 3D SHIP PURSUIT
+        // ========================================================
+
+        let directDirection =
             directionToShip(
                 sharkPosition:
                     shark.position,
                 shipPosition:
-                    game.spaceShip.position
+                    shipPosition
             )
 
-        let distance =
-            distanceBetween(
-                shark.position,
-                game.spaceShip.position
-            )
+        // ========================================================
+        // TARGET STRENGTH
+        // ========================================================
 
         let huntingFactor =
             max(
@@ -671,17 +783,9 @@ final class SharkManager {
                 min(
                     1.0,
                     1.0 -
-                    distance /
+                    distanceToShip /
                     huntingRange
                 )
-            )
-
-        let directTargetDirection =
-            directionToShip(
-                sharkPosition:
-                    shark.position,
-                shipPosition:
-                    game.spaceShip.position
             )
 
         let targetStrength =
@@ -689,21 +793,22 @@ final class SharkManager {
             huntingFactor *
             0.35
 
-        direction =
+        // ========================================================
+        // BLEND CELLULAR DIRECTION WITH DIRECT 3D TARGET
+        // ========================================================
+
+        let finalDirection =
             blendDirections(
                 current:
-                    direction,
+                    cellularDirection,
                 target:
-                    directTargetDirection,
+                    directDirection,
                 targetWeight:
                     targetStrength
             )
 
-        cellularDirections[id] =
-            direction
-
         // ========================================================
-        // HUNT SPEED
+        // SPEED
         // ========================================================
 
         let huntSpeed =
@@ -733,466 +838,671 @@ final class SharkManager {
             )
 
         // ========================================================
-        // MOVE OCEAN SHARK
+        // MOVE X
         // ========================================================
 
         shark.position.x +=
-            direction.x *
+            finalDirection.x *
             distanceStep
+
+        // ========================================================
+        // MOVE Y
+        // ========================================================
 
         shark.position.y +=
-            direction.y *
+            finalDirection.y *
             distanceStep
+
+        // ========================================================
+        // MOVE Z
+        // ========================================================
 
         shark.position.z +=
-            direction.z *
+            finalDirection.z *
             distanceStep
-
-        // ========================================================
-        // CELLULAR STATE UPDATE
-        // ========================================================
-
-        if timer >= cellularStepTime {
-
-            timer = 0.0
-
-            let newDirection =
-                chooseNextCellularDirection(
-                    shark:
-                        shark,
-                    game:
-                        game
-                )
-
-            cellularDirections[id] =
-                newDirection
-
-            direction =
-                newDirection
-        }
 
         cellularTimers[id] =
             timer
     }
 
     // ============================================================
-    // TERRAIN CLEARANCE
+    // ATTACK CORRECTION
+    //
+    // This guarantees vertical convergence toward the ship.
+    //
+    // The cellular automaton still supplies the base direction.
+    // The attack correction bends that direction toward the ship.
     // ============================================================
 
-    // ============================================================
-    // TERRAIN CLEARANCE
-    // ============================================================
+    private func attackCorrectedDirection(
+        cellularDirection: SCNVector3,
+        sharkPosition: SCNVector3,
+        shipPosition: SCNVector3,
+        distanceToShip: CGFloat
+    ) -> SCNVector3 {
 
-    private func enforceTerrainClearance(
-        shark: Shark
-    ) {
-        var position =
-            shark.position
-
-        let x =
-            CGFloat(position.x)
-
-        let z =
-            CGFloat(position.z)
-
-        let terrainY =
-            terrainHeight(
-                x: x,
-                z: z
+        let directDirection =
+            directionToShip(
+                sharkPosition:
+                    sharkPosition,
+                shipPosition:
+                    shipPosition
             )
 
-        let minimumY =
-            terrainY +
-            terrainSharkClearance
+        // ========================================================
+        // HARD ATTACK
+        // ========================================================
 
-        // Never allow the shark to enter the terrain.
-
-        if CGFloat(position.y) < minimumY {
-            position.y =
-                Float(minimumY)
+        if distanceToShip <= attackRange {
+            return directDirection
         }
 
-        shark.position =
-            position
-    }
-    // ============================================================
-    // TERRAIN BOUNDS
-    // ============================================================
-
-    // ============================================================
-    // TERRAIN BOUNDS
-    // ============================================================
-
-    private func applyTerrainBounds(
-        shark: Shark
-    ) {
-        var position =
-            shark.position
-
         // ========================================================
-        // X BOUNDS
+        // PURSUIT WEIGHT
         // ========================================================
 
-        if CGFloat(position.x) <
-            minimumTerrainX {
+        let pursuitWeight: CGFloat
 
-            position.x =
-                Float(
-                    minimumTerrainX
+        if distanceToShip <= hardPursuitRadius {
+
+            pursuitWeight = 0.98
+
+        } else if distanceToShip <= convergenceRadius {
+
+            let t =
+                (
+                    distanceToShip -
+                    hardPursuitRadius
                 )
-        }
-
-        if CGFloat(position.x) >
-            maximumTerrainX {
-
-            position.x =
-                Float(
-                    maximumTerrainX
+                /
+                (
+                    convergenceRadius -
+                    hardPursuitRadius
                 )
+
+            pursuitWeight =
+                0.98 -
+                (
+                    0.13 *
+                    t
+                )
+
+        } else if distanceToShip <= pursuitRadius {
+
+            let t =
+                (
+                    distanceToShip -
+                    convergenceRadius
+                )
+                /
+                (
+                    pursuitRadius -
+                    convergenceRadius
+                )
+
+            pursuitWeight =
+                0.85 -
+                (
+                    0.20 *
+                    t
+                )
+
+        } else {
+
+            pursuitWeight = 0.65
         }
 
         // ========================================================
-        // IMPORTANT:
-        //
-        // DO NOT CLAMP Z TO 0...40.
-        //
-        // The terrain world moves/streams along Z and the ship
-        // can be at Z = 100, 200, 300, etc.
-        //
-        // Sharks must be allowed to follow the ship in Z.
+        // NORMAL CELLULAR/TARGET BLEND
         // ========================================================
 
-        shark.position =
-            position
+        let blended =
+            blendDirections(
+                current:
+                    cellularDirection,
+                target:
+                    directDirection,
+                targetWeight:
+                    pursuitWeight
+            )
 
         // ========================================================
-        // TERRAIN SURFACE SAFETY
+        // EXPLICIT VERTICAL CORRECTION
+        //
+        // This is the critical addition.
+        //
+        // If:
+        //
+        // ship Y > shark Y
+        //
+        // verticalError is positive and the shark climbs.
+        //
+        // If:
+        //
+        // ship Y < shark Y
+        //
+        // verticalError is negative and the shark descends.
         // ========================================================
 
-        enforceTerrainClearance(
-            shark: shark
-        )
-    }
+        let verticalError =
+            CGFloat(shipPosition.y) -
+            CGFloat(sharkPosition.y)
 
-    // ============================================================
-    // TERRAIN FEEDING FRENZY
-    // ============================================================
+        let normalizedVerticalError =
+            max(
+                -1.0,
+                min(
+                    1.0,
+                    verticalError /
+                    verticalAttackDistance
+                )
+            )
 
-    // ============================================================
-    // TERRAIN FEEDING FRENZY
-    // ============================================================
+        // ========================================================
+        // VERTICAL CORRECTION STRENGTH
+        // ========================================================
 
-    private func feedingFrenzyDirection(shark: Shark, game: GameState) -> SCNVector3 {
+        let verticalCorrectionStrength =
+            verticalAttackWeight *
+            (
+                0.35 +
+                0.65 *
+                pursuitWeight
+            )
 
+        let correctedY =
+            CGFloat(blended.y) +
+            normalizedVerticalError *
+            verticalCorrectionStrength
 
-    // ============================================================
-    // ATTACK-AWARE CELLULAR AUTOMATON
-    //
-    // The cellular automaton still controls swarm behavior,
-    // but the spaceship is now a mandatory attractor.
-    //
-    // Priority:
-    //
-    //   1. SHIP ATTACK TARGET
-    //   2. CELLULAR AUTOMATON FLOW
-    //   3. SWARM COHESION
-    //   4. SEPARATION / RANDOMNESS
-    //
-    // As the shark approaches the ship, cellular freedom decreases.
-    // Inside the attack radius, the shark moves directly toward the
-    // ship regardless of the neighboring-cell score.
-    // ============================================================
-
-    let sharkPosition = shark.position
-    let shipPosition = game.spaceShip.position
-
-    // ------------------------------------------------------------
-    // DIRECT 3D VECTOR TO SHIP
-    // ------------------------------------------------------------
-
-    let directDirection = directionToShip(
-        sharkPosition: sharkPosition,
-        shipPosition: shipPosition
-    )
-
-    let shipDistance = distanceBetween(
-        sharkPosition,
-        shipPosition
-    )
-
-    // ------------------------------------------------------------
-    // ATTACK RADII
-    // ------------------------------------------------------------
-
-    let attackRadius: CGFloat = 12.0
-    let convergenceRadius: CGFloat = 30.0
-    let pursuitRadius: CGFloat = 60.0
-
-    // ============================================================
-    // RULE 1 — DIRECT ATTACK
-    //
-    // Once the shark enters the attack radius, the cellular
-    // automaton no longer has authority over direction.
-    //
-    // This prevents the shark from passing beside the ship.
-    // ============================================================
-
-    if shipDistance <= attackRadius {
+        let corrected =
+            SCNVector3(
+                blended.x,
+                Float(correctedY),
+                blended.z
+            )
 
         return normalizeDirection(
+            corrected
+        )
+    }
+
+    // ============================================================
+    // TERRAIN FEEDING FRENZY
+    //
+    // CELLULAR AUTOMATON + 3D SHIP ATTACK
+    // ============================================================
+
+    private func feedingFrenzyDirection(
+        shark: Shark,
+        game: GameState
+    ) -> SCNVector3 {
+
+        let sharkPosition =
+            shark.position
+
+        let shipPosition =
+            game.spaceShip.position
+
+        // ========================================================
+        // DIRECT 3D VECTOR
+        // ========================================================
+
+        let directDirection =
+            directionToShip(
+                sharkPosition:
+                    sharkPosition,
+                shipPosition:
+                    shipPosition
+            )
+
+        let shipDistance =
+            distanceBetween(
+                sharkPosition,
+                shipPosition
+            )
+
+        // ========================================================
+        // HARD ATTACK
+        // ========================================================
+
+        if shipDistance <= attackRange {
+            return directDirection
+        }
+
+        // ========================================================
+        // CELLULAR GRID
+        // ========================================================
+
+        let currentCell =
+            worldToCell(
+                sharkPosition
+            )
+
+        let neighborOffsets:
+            [(Int, Int, Int)] = [
+                ( 1,  0,  0),
+                (-1,  0,  0),
+                ( 0,  1,  0),
+                ( 0, -1,  0),
+                ( 0,  0,  1),
+                ( 0,  0, -1)
+            ]
+
+        var bestDirection =
             directDirection
-        )
-    }
 
-    // ============================================================
-    // CELLULAR AUTOMATON
-    // ============================================================
+        var bestScore =
+            -CGFloat.greatestFiniteMagnitude
 
-    let currentCell = worldToCell(sharkPosition)
+        // ========================================================
+        // PURSUIT WEIGHT
+        // ========================================================
 
-    let neighborOffsets: [(Int, Int, Int)] = [
-        ( 1,  0,  0),
-        (-1,  0,  0),
-        ( 0,  1,  0),
-        ( 0, -1,  0),
-        ( 0,  0,  1),
-        ( 0,  0, -1)
-    ]
+        let pursuitWeight: CGFloat
 
-    var bestDirection = directDirection
-    var bestScore = -Double.infinity
+        if shipDistance <= hardPursuitRadius {
 
-    // ------------------------------------------------------------
-    // DISTANCE-BASED PURSUIT WEIGHT
-    //
-    // Far away:
-    //     cellular automaton has more freedom.
-    //
-    // Near ship:
-    //     ship attraction dominates.
-    // ------------------------------------------------------------
+            pursuitWeight = 0.98
 
-    let pursuitWeight: CGFloat
+        } else if shipDistance <= convergenceRadius {
 
-    if shipDistance <= convergenceRadius {
+            let t =
+                (
+                    shipDistance -
+                    hardPursuitRadius
+                )
+                /
+                (
+                    convergenceRadius -
+                    hardPursuitRadius
+                )
 
-        // Strong convergence toward ship.
-        pursuitWeight = 0.90
+            pursuitWeight =
+                0.98 -
+                (
+                    0.13 *
+                    t
+                )
 
-    } else if shipDistance <= pursuitRadius {
+        } else if shipDistance <= pursuitRadius {
 
-        // Transition from swarm behavior to pursuit.
-        let t = (shipDistance - convergenceRadius) /
-                (pursuitRadius - convergenceRadius)
+            let t =
+                (
+                    shipDistance -
+                    convergenceRadius
+                )
+                /
+                (
+                    pursuitRadius -
+                    convergenceRadius
+                )
 
-        pursuitWeight = 0.90 - (0.25 * t)
+            pursuitWeight =
+                0.85 -
+                (
+                    0.20 *
+                    t
+                )
 
-    } else {
+        } else {
 
-        // Far from ship, preserve more cellular behavior.
-        pursuitWeight = 0.65
-    }
-
-    let cellularWeight = 1.0 - pursuitWeight
-
-    // ============================================================
-    // EVALUATE SIX CELLULAR NEIGHBORS
-    // ============================================================
-
-    for offset in neighborOffsets {
-
-        let nextCell = (
-            currentCell.x + offset.0,
-            currentCell.y + offset.1,
-            currentCell.z + offset.2
-        )
-
-        let candidatePosition = cellToWorld(nextCell)
-
-        // --------------------------------------------------------
-        // X TERRAIN BOUNDARY
-        //
-        // Do not restrict Z. The terrain/world can continue forward
-        // as the ship moves.
-        // --------------------------------------------------------
-
-        if candidatePosition.x < Float(minimumTerrainX) ||
-           candidatePosition.x > Float(maximumTerrainX) {
-
-            continue
+            pursuitWeight = 0.65
         }
 
-        // --------------------------------------------------------
-        // TERRAIN CLEARANCE
-        // --------------------------------------------------------
+        let cellularWeight =
+            1.0 -
+            pursuitWeight
 
-        let candidateTerrainY = terrainHeight(
-            x: CGFloat(candidatePosition.x),
-            z: CGFloat(candidatePosition.z)
-        )
+        // ========================================================
+        // CURRENT VERTICAL ERROR
+        // ========================================================
 
-        let minimumCandidateY =
-            candidateTerrainY + terrainSharkClearance
-
-        if CGFloat(candidatePosition.y) < minimumCandidateY {
-            continue
-        }
-
-        // --------------------------------------------------------
-        // CANDIDATE DIRECTION
-        // --------------------------------------------------------
-
-        let candidateDirection = normalizeDirection(
-            SCNVector3(
-                candidatePosition.x - sharkPosition.x,
-                candidatePosition.y - sharkPosition.y,
-                candidatePosition.z - sharkPosition.z
+        let currentVerticalError =
+            abs(
+                CGFloat(shipPosition.y) -
+                CGFloat(sharkPosition.y)
             )
-        )
 
-        // --------------------------------------------------------
-        // SHIP ALIGNMENT
-        //
-        // A cellular neighbor pointing toward the ship gets a
-        // substantially higher score.
-        // --------------------------------------------------------
+        // ========================================================
+        // EVALUATE SIX CELLULAR NEIGHBORS
+        // ========================================================
 
-        let shipAlignment = CGFloat(
-            dotProduct(
-                candidateDirection,
-                directDirection
+        for offset in neighborOffsets {
+
+            let nextCell = (
+                currentCell.x +
+                    offset.0,
+                currentCell.y +
+                    offset.1,
+                currentCell.z +
+                    offset.2
             )
-        )
 
-        // --------------------------------------------------------
-        // DISTANCE AFTER MOVEMENT
-        //
-        // Prefer cells that bring the shark closer to the ship.
-        // --------------------------------------------------------
+            let candidatePosition =
+                cellToWorld(
+                    nextCell
+                )
 
-        let candidateDistance = distanceBetween(
-            candidatePosition,
-            shipPosition
-        )
+            // ====================================================
+            // TERRAIN X LIMIT
+            // ====================================================
 
-        let distanceImprovement =
-            shipDistance - candidateDistance
+            if CGFloat(candidatePosition.x) <
+                minimumTerrainX {
 
-        // --------------------------------------------------------
-        // ATTACK ALIGNMENT
-        //
-        // This is deliberately stronger than ordinary cellular
-        // movement. A neighbor that points toward the ship should
-        // beat a neighbor that merely continues forward.
-        // --------------------------------------------------------
-
-        let attackScore =
-            shipAlignment * 12.0
-
-        let convergenceScore =
-            distanceImprovement * 1.5
-
-        // --------------------------------------------------------
-        // SWARM / CELLULAR COMPONENT
-        // --------------------------------------------------------
-
-        var swarmScore: CGFloat = 0.0
-
-        for otherShark in game.sharks {
-
-            if otherShark === shark || otherShark.destroyed {
                 continue
             }
 
-            let otherPosition = otherShark.position
+            if CGFloat(candidatePosition.x) >
+                maximumTerrainX {
 
-            let distance = distanceBetween(
-                candidatePosition,
-                otherPosition
+                continue
+            }
+
+            // ====================================================
+            // TERRAIN CLEARANCE
+            // ====================================================
+
+            let candidateTerrainY =
+                terrainHeight(
+                    x:
+                        CGFloat(
+                            candidatePosition.x
+                        ),
+                    z:
+                        CGFloat(
+                            candidatePosition.z
+                        )
+                )
+
+            let minimumCandidateY =
+                candidateTerrainY +
+                terrainSharkClearance
+
+            if CGFloat(candidatePosition.y) <
+                minimumCandidateY {
+
+                continue
+            }
+
+            // ====================================================
+            // CANDIDATE DIRECTION
+            // ====================================================
+
+            let candidateDirection =
+                normalizeDirection(
+                    SCNVector3(
+                        candidatePosition.x -
+                            sharkPosition.x,
+                        candidatePosition.y -
+                            sharkPosition.y,
+                        candidatePosition.z -
+                            sharkPosition.z
+                    )
+                )
+
+            // ====================================================
+            // SHIP ALIGNMENT
+            // ====================================================
+
+            let alignment =
+                dotProduct(
+                    candidateDirection,
+                    directDirection
+                )
+
+            // ====================================================
+            // CANDIDATE DISTANCE
+            // ====================================================
+
+            let candidateDistance =
+                distanceBetween(
+                    candidatePosition,
+                    shipPosition
+                )
+
+            let distanceImprovement =
+                shipDistance -
+                candidateDistance
+
+            // ====================================================
+            // VERTICAL ERROR
+            // ====================================================
+
+            let candidateVerticalError =
+                abs(
+                    CGFloat(shipPosition.y) -
+                    CGFloat(candidatePosition.y)
+                )
+
+            let verticalImprovement =
+                currentVerticalError -
+                candidateVerticalError
+
+            // ====================================================
+            // VERTICAL DIRECTION SCORE
+            // ====================================================
+            //
+            // This explicitly rewards cells that move the shark
+            // toward the ship's altitude.
+            //
+            // ====================================================
+
+            let verticalScore =
+                verticalImprovement *
+                (
+                    15.0 +
+                    40.0 *
+                    pursuitWeight
+                ) *
+                verticalAttackWeight
+
+            // ====================================================
+            // ATTACK ALIGNMENT SCORE
+            // ====================================================
+
+            let attackScore =
+                alignment *
+                (
+                    30.0 +
+                    70.0 *
+                    pursuitWeight
+                )
+
+            // ====================================================
+            // POSITIVE ALIGNMENT BONUS
+            // ====================================================
+
+            let positiveAlignment =
+                max(
+                    0.0,
+                    alignment
+                )
+
+            let pursuitScore =
+                pow(
+                    positiveAlignment,
+                    2.0
+                )
+                *
+                50.0
+                *
+                pursuitWeight
+
+            // ====================================================
+            // DISTANCE CONVERGENCE
+            // ====================================================
+
+            let convergenceScore: CGFloat
+
+            if distanceImprovement > 0.0 {
+
+                convergenceScore =
+                    distanceImprovement *
+                    10.0
+
+            } else {
+
+                convergenceScore =
+                    distanceImprovement *
+                    25.0
+            }
+
+            // ====================================================
+            // SWARM SCORE
+            // ====================================================
+
+            var swarmScore: CGFloat = 0.0
+
+            for otherShark in game.sharks {
+
+                if otherShark === shark ||
+                    otherShark.destroyed {
+
+                    continue
+                }
+
+                let otherDistance =
+                    distanceBetween(
+                        candidatePosition,
+                        otherShark.position
+                    )
+
+                // =================================================
+                // COHESION
+                // =================================================
+
+                if otherDistance < swarmRadius {
+
+                    let cohesion =
+                        (
+                            swarmRadius -
+                            otherDistance
+                        )
+                        /
+                        swarmRadius
+
+                    swarmScore +=
+                        cohesion *
+                        1.5
+                }
+
+                // =================================================
+                // SEPARATION
+                // =================================================
+
+                if otherDistance <
+                    sharkSeparationRadius {
+
+                    let separation =
+                        sharkSeparationRadius -
+                        otherDistance
+
+                    swarmScore -=
+                        separation *
+                        3.0
+                }
+            }
+
+            // ====================================================
+            // RANDOM CELLULAR VARIATION
+            // ====================================================
+
+            var randomScore: CGFloat = 0.0
+
+            if CGFloat.random(in: 0.0...1.0) <
+                randomMovementProbability {
+
+                randomScore =
+                    CGFloat.random(
+                        in:
+                            -1.0...1.0
+                    )
+            }
+
+            // ====================================================
+            // TOTAL CELL SCORE
+            // ====================================================
+
+            let score =
+                attackScore +
+                pursuitScore +
+                convergenceScore +
+                verticalScore +
+                swarmScore +
+                randomScore
+
+            // ====================================================
+            // BEST CELL
+            // ====================================================
+
+            if score > bestScore {
+
+                bestScore =
+                    score
+
+                bestDirection =
+                    candidateDirection
+            }
+        }
+
+        // ========================================================
+        // CELLULAR + DIRECT SHIP BLEND
+        // ========================================================
+
+        let blended =
+            blendDirections(
+                current:
+                    bestDirection,
+                target:
+                    directDirection,
+                targetWeight:
+                    pursuitWeight
             )
 
-            // Mild attraction to nearby sharks.
-            if distance < 10.0 {
+        // ========================================================
+        // FINAL EXPLICIT VERTICAL CORRECTION
+        // ========================================================
 
-                swarmScore +=
-                    CGFloat(10.0 - distance) * 0.10
-            }
+        let verticalError =
+            CGFloat(shipPosition.y) -
+            CGFloat(sharkPosition.y)
 
-            // Separation prevents sharks from occupying the exact
-            // same location.
-            if distance < 2.5 {
+        let normalizedVerticalError =
+            max(
+                -1.0,
+                min(
+                    1.0,
+                    verticalError /
+                    verticalAttackDistance
+                )
+            )
 
-                swarmScore -=
-                    CGFloat(2.5 - distance) * 1.0
-            }
-        }
+        let verticalCorrectionStrength =
+            verticalAttackWeight *
+            (
+                0.30 +
+                0.70 *
+                pursuitWeight
+            )
 
-        // --------------------------------------------------------
-        // SMALL RANDOM CELLULAR COMPONENT
-        //
-        // Keeps the swarm from looking perfectly mechanical while
-        // remaining subordinate to the attack vector.
-        // --------------------------------------------------------
+        let correctedY =
+            CGFloat(blended.y) +
+            normalizedVerticalError *
+            verticalCorrectionStrength
 
-        let randomScore =
-            CGFloat.random(in: -0.5...0.5)
-
-        // --------------------------------------------------------
-        // TOTAL CELL SCORE
-        // --------------------------------------------------------
-
-        let score =
-            Double(attackScore) +
-            Double(convergenceScore) +
-            Double(swarmScore) +
-            Double(randomScore)
-
-        if score > bestScore {
-
-            bestScore = score
-            bestDirection = candidateDirection
-        }
-    }
-
-    // ============================================================
-    // FINAL ATTACK / CELLULAR BLEND
-    //
-    // The cellular direction is blended with the actual vector
-    // toward the spaceship.
-    //
-    // IMPORTANT:
-    //
-    // The ship vector is normalized AFTER blending.
-    // Therefore the resulting direction remains a true movement
-    // direction.
-    // ============================================================
-
-    let blendedDirection = SCNVector3(
-        Float(
-            CGFloat(bestDirection.x) * cellularWeight +
-            CGFloat(directDirection.x) * pursuitWeight
-        ),
-
-        Float(
-            CGFloat(bestDirection.y) * cellularWeight +
-            CGFloat(directDirection.y) * pursuitWeight
-        ),
-
-        Float(
-            CGFloat(bestDirection.z) * cellularWeight +
-            CGFloat(directDirection.z) * pursuitWeight
+        return normalizeDirection(
+            SCNVector3(
+                blended.x,
+                Float(correctedY),
+                blended.z
+            )
         )
-    )
-
-    return normalizeDirection(
-        blendedDirection
-    )
-
     }
 
-
     // ============================================================
-    // OCEAN CELLULAR AUTOMATA RULE
+    // OCEAN CELLULAR AUTOMATON
     // ============================================================
 
     private func chooseNextCellularDirection(
@@ -1214,29 +1524,38 @@ final class SharkManager {
                     shipPosition
             )
 
-        let distance =
+        let distanceToShip =
             distanceBetween(
                 sharkPosition,
                 shipPosition
             )
 
-        let neighbors:
-            [(Int, Int, Int)] = [
+        // ========================================================
+        // HARD ATTACK
+        // ========================================================
 
-                ( 1, 0, 0),
-                (-1, 0, 0),
+        if distanceToShip <= attackRange {
+            return directDirection
+        }
 
-                ( 0, 1, 0),
-                ( 0,-1, 0),
-
-                ( 0, 0, 1),
-                ( 0, 0,-1)
-            ]
+        // ========================================================
+        // CURRENT CELL
+        // ========================================================
 
         let currentCell =
             worldToCell(
                 sharkPosition
             )
+
+        let neighbors:
+            [(Int, Int, Int)] = [
+                ( 1,  0,  0),
+                (-1,  0,  0),
+                ( 0,  1,  0),
+                ( 0, -1,  0),
+                ( 0,  0,  1),
+                ( 0,  0, -1)
+            ]
 
         var bestDirection =
             directDirection
@@ -1244,38 +1563,62 @@ final class SharkManager {
         var bestScore =
             -CGFloat.greatestFiniteMagnitude
 
-        let cellMinimumX =
-            minimumOceanX
+        // ========================================================
+        // PURSUIT WEIGHT
+        // ========================================================
 
-        let cellMaximumX =
-            maximumOceanX
+        let pursuitWeight: CGFloat
 
-        let cellMinimumY =
-            minimumOceanY
+        if distanceToShip <= hardPursuitRadius {
 
-        let cellMaximumY =
-            maximumOceanY
+            pursuitWeight = 0.98
 
-        let huntingFactor =
-            max(
-                0.0,
-                min(
-                    1.0,
-                    1.0 -
-                    distance /
-                    huntingRange
+        } else if distanceToShip <= convergenceRadius {
+
+            let t =
+                (
+                    distanceToShip -
+                    hardPursuitRadius
                 )
+                /
+                (
+                    convergenceRadius -
+                    hardPursuitRadius
+                )
+
+            pursuitWeight =
+                0.98 -
+                (
+                    0.13 *
+                    t
+                )
+
+        } else {
+
+            pursuitWeight = 0.75
+        }
+
+        // ========================================================
+        // CURRENT VERTICAL ERROR
+        // ========================================================
+
+        let currentVerticalError =
+            abs(
+                CGFloat(shipPosition.y) -
+                CGFloat(sharkPosition.y)
             )
+
+        // ========================================================
+        // CELLULAR NEIGHBORS
+        // ========================================================
 
         for neighbor in neighbors {
 
             let nextCell = (
                 currentCell.x +
                     neighbor.0,
-
                 currentCell.y +
                     neighbor.1,
-
                 currentCell.z +
                     neighbor.2
             )
@@ -1285,36 +1628,57 @@ final class SharkManager {
                     nextCell
                 )
 
-            if CGFloat(candidatePosition.x)
-                < cellMinimumX {
+            // ====================================================
+            // OCEAN X BOUNDS
+            // ====================================================
+
+            if CGFloat(candidatePosition.x) <
+                minimumOceanX {
 
                 continue
             }
 
-            if CGFloat(candidatePosition.x)
-                > cellMaximumX {
+            if CGFloat(candidatePosition.x) >
+                maximumOceanX {
 
                 continue
             }
 
-            if CGFloat(candidatePosition.y)
-                < cellMinimumY {
+            // ====================================================
+            // OCEAN Y BOUNDS
+            // ====================================================
+
+            if CGFloat(candidatePosition.y) <
+                minimumOceanY {
 
                 continue
             }
 
-            if CGFloat(candidatePosition.y)
-                > cellMaximumY {
+            if CGFloat(candidatePosition.y) >
+                maximumOceanY {
 
                 continue
             }
+
+            // ====================================================
+            // CANDIDATE DIRECTION
+            // ====================================================
 
             let candidateDirection =
-                SCNVector3(
-                    Float(neighbor.0),
-                    Float(neighbor.1),
-                    Float(neighbor.2)
+                normalizeDirection(
+                    SCNVector3(
+                        candidatePosition.x -
+                            sharkPosition.x,
+                        candidatePosition.y -
+                            sharkPosition.y,
+                        candidatePosition.z -
+                            sharkPosition.z
+                    )
                 )
+
+            // ====================================================
+            // ALIGNMENT
+            // ====================================================
 
             let alignment =
                 dotProduct(
@@ -1322,30 +1686,9 @@ final class SharkManager {
                     directDirection
                 )
 
-            var score: CGFloat =
-                0.0
-
-            score +=
-                max(
-                    0.0,
-                    alignment
-                ) *
-                (
-                    10.0 +
-                    huntingFactor *
-                    30.0
-                )
-
-            score +=
-                min(
-                    0.0,
-                    alignment
-                ) *
-                (
-                    8.0 +
-                    huntingFactor *
-                    25.0
-                )
+            // ====================================================
+            // DISTANCE
+            // ====================================================
 
             let candidateDistance =
                 distanceBetween(
@@ -1353,52 +1696,142 @@ final class SharkManager {
                     shipPosition
                 )
 
-            score +=
-                1.0 /
+            let distanceImprovement =
+                distanceToShip -
+                candidateDistance
+
+            // ====================================================
+            // VERTICAL IMPROVEMENT
+            // ====================================================
+
+            let candidateVerticalError =
+                abs(
+                    CGFloat(shipPosition.y) -
+                    CGFloat(candidatePosition.y)
+                )
+
+            let verticalImprovement =
+                currentVerticalError -
+                candidateVerticalError
+
+            // ====================================================
+            // ATTACK SCORE
+            // ====================================================
+
+            let attackScore =
+                alignment *
                 (
-                    1.0 +
-                    candidateDistance
+                    30.0 +
+                    70.0 *
+                    pursuitWeight
+                )
+
+            // ====================================================
+            // CONVERGENCE
+            // ====================================================
+
+            let convergenceScore: CGFloat
+
+            if distanceImprovement > 0.0 {
+
+                convergenceScore =
+                    distanceImprovement *
+                    10.0
+
+            } else {
+
+                convergenceScore =
+                    distanceImprovement *
+                    25.0
+            }
+
+            // ====================================================
+            // VERTICAL ATTACK SCORE
+            // ====================================================
+
+            let verticalScore =
+                verticalImprovement *
+                (
+                    15.0 +
+                    40.0 *
+                    pursuitWeight
                 ) *
-                10.0
+                verticalAttackWeight
 
-            if distance < 20.0 {
+            // ====================================================
+            // POSITIVE ALIGNMENT
+            // ====================================================
 
-                score +=
+            let positiveAlignment =
+                max(
+                    0.0,
+                    alignment
+                )
+
+            let pursuitScore =
+                pow(
+                    positiveAlignment,
+                    2.0
+                )
+                *
+                50.0
+                *
+                pursuitWeight
+
+            // ====================================================
+            // CLOSE-RANGE BONUS
+            // ====================================================
+
+            var closeRangeBonus:
+                CGFloat = 0.0
+
+            if distanceToShip < 30.0 {
+
+                closeRangeBonus +=
                     max(
                         0.0,
                         alignment
-                    ) *
-                    30.0
+                    )
+                    *
+                    50.0
             }
 
-            if distance < 10.0 {
+            if distanceToShip < 15.0 {
 
-                score +=
+                closeRangeBonus +=
                     max(
                         0.0,
                         alignment
-                    ) *
-                    60.0
-            }
-
-            if distance < 5.0 {
-
-                score +=
-                    max(
-                        0.0,
-                        alignment
-                    ) *
+                    )
+                    *
                     100.0
             }
 
-            let randomAmount =
+            // ====================================================
+            // RANDOM CELLULAR COMPONENT
+            // ====================================================
+
+            let randomScore =
                 CGFloat.random(
                     in:
-                        -randomMovementProbability...randomMovementProbability
+                        -0.10...0.10
                 )
 
-            score +=
-                randomAmount
+            // ====================================================
+            // TOTAL SCORE
+            // ====================================================
+
+            let score =
+                attackScore +
+                pursuitScore +
+                convergenceScore +
+                verticalScore +
+                closeRangeBonus +
+                randomScore
+
+            // ====================================================
+            // BEST CELL
+            // ====================================================
 
             if score > bestScore {
 
@@ -1410,13 +1843,28 @@ final class SharkManager {
             }
         }
 
-        return normalizeDirection(
-            bestDirection
+        // ========================================================
+        // CELLULAR + DIRECT 3D ATTACK
+        // ========================================================
+
+        return blendDirections(
+            current:
+                bestDirection,
+            target:
+                directDirection,
+            targetWeight:
+                pursuitWeight
         )
     }
 
     // ============================================================
     // DIRECTION TO SHIP
+    //
+    // FULL 3D VECTOR
+    //
+    // X = horizontal
+    // Y = vertical
+    // Z = forward/backward
     // ============================================================
 
     private func directionToShip(
@@ -1446,16 +1894,22 @@ final class SharkManager {
         guard length > 0.001 else {
 
             return SCNVector3(
-                0,
-                0,
-                -1
+                0.0,
+                0.0,
+                -1.0
             )
         }
 
         return SCNVector3(
-            Float(dx / length),
-            Float(dy / length),
-            Float(dz / length)
+            Float(
+                dx / length
+            ),
+            Float(
+                dy / length
+            ),
+            Float(
+                dz / length
+            )
         )
     }
 
@@ -1469,33 +1923,39 @@ final class SharkManager {
         targetWeight: CGFloat
     ) -> SCNVector3 {
 
-        let currentWeight =
+        let safeTargetWeight =
             max(
                 0.0,
-                1.0 -
-                targetWeight
+                min(
+                    1.0,
+                    targetWeight
+                )
             )
+
+        let currentWeight =
+            1.0 -
+            safeTargetWeight
 
         let x =
             CGFloat(current.x) *
             currentWeight
             +
             CGFloat(target.x) *
-            targetWeight
+            safeTargetWeight
 
         let y =
             CGFloat(current.y) *
             currentWeight
             +
             CGFloat(target.y) *
-            targetWeight
+            safeTargetWeight
 
         let z =
             CGFloat(current.z) *
             currentWeight
             +
             CGFloat(target.z) *
-            targetWeight
+            safeTargetWeight
 
         return normalizeDirection(
             SCNVector3(
@@ -1555,7 +2015,7 @@ final class SharkManager {
     }
 
     // ============================================================
-    // WORLD → CELL
+    // WORLD TO CELL
     // ============================================================
 
     private func worldToCell(
@@ -1567,21 +2027,18 @@ final class SharkManager {
     ) {
 
         return (
-
             Int(
                 floor(
                     CGFloat(position.x) /
                     cellSize
                 )
             ),
-
             Int(
                 floor(
                     CGFloat(position.y) /
                     cellSize
                 )
             ),
-
             Int(
                 floor(
                     CGFloat(position.z) /
@@ -1592,11 +2049,7 @@ final class SharkManager {
     }
 
     // ============================================================
-    // CELL → WORLD
-    // ============================================================
-    //
-    // Cell centers are calculated consistently around world zero.
-    //
+    // CELL TO WORLD
     // ============================================================
 
     private func cellToWorld(
@@ -1611,21 +2064,24 @@ final class SharkManager {
             (
                 CGFloat(cell.x) +
                 0.5
-            ) *
+            )
+            *
             cellSize
 
         let worldY =
             (
                 CGFloat(cell.y) +
                 0.5
-            ) *
+            )
+            *
             cellSize
 
         let worldZ =
             (
                 CGFloat(cell.z) +
                 0.5
-            ) *
+            )
+            *
             cellSize
 
         return SCNVector3(
@@ -1662,16 +2118,133 @@ final class SharkManager {
         guard length > 0.001 else {
 
             return SCNVector3(
-                0,
-                0,
-                -1
+                0.0,
+                0.0,
+                -1.0
             )
         }
 
         return SCNVector3(
-            Float(x / length),
-            Float(y / length),
-            Float(z / length)
+            Float(
+                x / length
+            ),
+            Float(
+                y / length
+            ),
+            Float(
+                z / length
+            )
+        )
+    }
+
+    // ============================================================
+    // TERRAIN CLEARANCE
+    //
+    // IMPORTANT:
+    //
+    // This only prevents the shark from going THROUGH the terrain.
+    //
+    // It does NOT limit the shark's height above the terrain.
+    //
+    // Therefore a shark can climb toward a ship above it.
+    // ============================================================
+
+    private func enforceTerrainClearance(
+        shark: Shark
+    ) {
+
+        var position =
+            shark.position
+
+        let x =
+            CGFloat(position.x)
+
+        let z =
+            CGFloat(position.z)
+
+        let terrainY =
+            terrainHeight(
+                x: x,
+                z: z
+            )
+
+        let minimumY =
+            terrainY +
+            terrainSharkClearance
+
+        if CGFloat(position.y) < minimumY {
+
+            position.y =
+                Float(
+                    minimumY
+                )
+        }
+
+        shark.position =
+            position
+    }
+
+    // ============================================================
+    // TERRAIN BOUNDS
+    //
+    // X ONLY
+    //
+    // Z IS INTENTIONALLY UNBOUNDED.
+    // ============================================================
+
+    private func applyTerrainBounds(
+        shark: Shark
+    ) {
+
+        var position =
+            shark.position
+
+        // ========================================================
+        // X
+        // ========================================================
+
+        if CGFloat(position.x) <
+            minimumTerrainX {
+
+            position.x =
+                Float(
+                    minimumTerrainX
+                )
+        }
+
+        if CGFloat(position.x) >
+            maximumTerrainX {
+
+            position.x =
+                Float(
+                    maximumTerrainX
+                )
+        }
+
+        // ========================================================
+        // NO Z CLAMP
+        // ========================================================
+        //
+        // DO NOT add:
+        //
+        // position.z = max(...)
+        //
+        // DO NOT add:
+        //
+        // position.z = min(...)
+        //
+        // Sharks need to follow the ship forward.
+        // ========================================================
+
+        shark.position =
+            position
+
+        // ========================================================
+        // TERRAIN CLEARANCE
+        // ========================================================
+
+        enforceTerrainClearance(
+            shark: shark
         )
     }
 
@@ -1686,8 +2259,12 @@ final class SharkManager {
         var position =
             shark.position
 
-        if CGFloat(position.x)
-            < minimumOceanX {
+        // ========================================================
+        // X
+        // ========================================================
+
+        if CGFloat(position.x) <
+            minimumOceanX {
 
             position.x =
                 Float(
@@ -1695,8 +2272,8 @@ final class SharkManager {
                 )
         }
 
-        if CGFloat(position.x)
-            > maximumOceanX {
+        if CGFloat(position.x) >
+            maximumOceanX {
 
             position.x =
                 Float(
@@ -1704,8 +2281,12 @@ final class SharkManager {
                 )
         }
 
-        if CGFloat(position.y)
-            < minimumOceanY {
+        // ========================================================
+        // Y
+        // ========================================================
+
+        if CGFloat(position.y) <
+            minimumOceanY {
 
             position.y =
                 Float(
@@ -1713,8 +2294,8 @@ final class SharkManager {
                 )
         }
 
-        if CGFloat(position.y)
-            > maximumOceanY {
+        if CGFloat(position.y) >
+            maximumOceanY {
 
             position.y =
                 Float(
@@ -1727,22 +2308,19 @@ final class SharkManager {
     }
 
     // ============================================================
-    // REMOVAL
+    // REMOVE INACTIVE SHARKS
     // ============================================================
 
     private func removeInactiveSharks(
         game: GameState
     ) {
+
         game.sharks.removeAll { shark in
 
             let id =
                 ObjectIdentifier(
                     shark
                 )
-
-            // ====================================================
-            // DESTROYED
-            // ====================================================
 
             if shark.destroyed {
 
@@ -1759,13 +2337,6 @@ final class SharkManager {
                 return true
             }
 
-            // ====================================================
-            // KEEP SHARK
-            //
-            // Sharks are no longer removed simply because they
-            // are more than 120 units from the spaceship.
-            // ====================================================
-
             return false
         }
     }
@@ -1778,8 +2349,7 @@ final class SharkManager {
         game: GameState
     ) {
 
-        spawnClock =
-            0.0
+        spawnClock = 0.0
 
         cellularTimers.removeAll()
 
@@ -1788,4 +2358,3 @@ final class SharkManager {
         game.sharks.removeAll()
     }
 }
-
