@@ -29,25 +29,25 @@
 
 /* Begin PBXFileReference section */
 		F79A012F3044DBD400F14310 /* FlockAlien.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlockAlien.swift; sourceTree = "<group>"; };
-		F7D9534230106AC6009D0539 /* Space Drone with Asteriods.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Space Drone with Asteriods.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		F7D9535430106AC7009D0539 /* Space Drone with AsteriodsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Space Drone with AsteriodsTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
-		F7D9535E30106AC8009D0539 /* Space Drone with AsteriodsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Space Drone with AsteriodsUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		F7D9534230106AC6009D0539 /* Space Drone Stellar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Space Drone Stellar.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		F7D9535430106AC7009D0539 /* Space Drone StellarTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Space Drone StellarTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		F7D9535E30106AC8009D0539 /* Space Drone StellarUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Space Drone StellarUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		F7D9534430106AC6009D0539 /* Space Drone with Asteriods */ = {
+		F7D9534430106AC6009D0539 /* Space DroneStellar */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "Space Drone with Asteriods";
+			path = "Space DroneStellar";
 			sourceTree = "<group>";
 		};
-		F7D9535730106AC7009D0539 /* Space Drone with AsteriodsTests */ = {
+		F7D9535730106AC7009D0539 /* Space Drone Stellar Tests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "Space Drone with AsteriodsTests";
+			path = "Space Drone Stellar Tests";
 			sourceTree = "<group>";
 		};
-		F7D9536130106AC8009D0539 /* Space Drone with AsteriodsUITests */ = {
+		F7D9536130106AC8009D0539 /* Space Drone Stellar UITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "Space Drone with AsteriodsUITests";
+			path = "Space Drone Stellar UITests";
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -81,9 +81,9 @@
 			isa = PBXGroup;
 			children = (
 				F79A012F3044DBD400F14310 /* FlockAlien.swift */,
-				F7D9534430106AC6009D0539 /* Space Drone with Asteriods */,
-				F7D9535730106AC7009D0539 /* Space Drone with AsteriodsTests */,
-				F7D9536130106AC8009D0539 /* Space Drone with AsteriodsUITests */,
+				F7D9534430106AC6009D0539 /* Space DroneStellar */,
+				F7D9535730106AC7009D0539 /* Space Drone Stellar Tests */,
+				F7D9536130106AC8009D0539 /* Space Drone Stellar UITests */,
 				F7D9534330106AC6009D0539 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -91,9 +91,9 @@
 		F7D9534330106AC6009D0539 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				F7D9534230106AC6009D0539 /* Space Drone with Asteriods.app */,
-				F7D9535430106AC7009D0539 /* Space Drone with AsteriodsTests.xctest */,
-				F7D9535E30106AC8009D0539 /* Space Drone with AsteriodsUITests.xctest */,
+				F7D9534230106AC6009D0539 /* Space Drone Stellar.app */,
+				F7D9535430106AC7009D0539 /* Space Drone StellarTests.xctest */,
+				F7D9535E30106AC8009D0539 /* Space Drone StellarUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -101,9 +101,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		F7D9534130106AC6009D0539 /* Space Drone with Asteriods */ = {
+		F7D9534130106AC6009D0539 /* Space Drone Stellar */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = F7D9536830106AC8009D0539 /* Build configuration list for PBXNativeTarget "Space Drone with Asteriods" */;
+			buildConfigurationList = F7D9536830106AC8009D0539 /* Build configuration list for PBXNativeTarget "Space Drone Stellar" */;
 			buildPhases = (
 				F7D9533E30106AC6009D0539 /* Sources */,
 				F7D9533F30106AC6009D0539 /* Frameworks */,
@@ -114,18 +114,18 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				F7D9534430106AC6009D0539 /* Space Drone with Asteriods */,
+				F7D9534430106AC6009D0539 /* Space DroneStellar */,
 			);
-			name = "Space Drone with Asteriods";
+			name = "Space Drone Stellar";
 			packageProductDependencies = (
 			);
 			productName = "Space Drone with Asteriods";
-			productReference = F7D9534230106AC6009D0539 /* Space Drone with Asteriods.app */;
+			productReference = F7D9534230106AC6009D0539 /* Space Drone Stellar.app */;
 			productType = "com.apple.product-type.application";
 		};
-		F7D9535330106AC7009D0539 /* Space Drone with AsteriodsTests */ = {
+		F7D9535330106AC7009D0539 /* Space Drone StellarTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = F7D9536B30106AC8009D0539 /* Build configuration list for PBXNativeTarget "Space Drone with AsteriodsTests" */;
+			buildConfigurationList = F7D9536B30106AC8009D0539 /* Build configuration list for PBXNativeTarget "Space Drone StellarTests" */;
 			buildPhases = (
 				F7D9535030106AC7009D0539 /* Sources */,
 				F7D9535130106AC7009D0539 /* Frameworks */,
@@ -137,18 +137,18 @@
 				F7D9535630106AC7009D0539 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				F7D9535730106AC7009D0539 /* Space Drone with AsteriodsTests */,
+				F7D9535730106AC7009D0539 /* Space Drone Stellar Tests */,
 			);
-			name = "Space Drone with AsteriodsTests";
+			name = "Space Drone StellarTests";
 			packageProductDependencies = (
 			);
 			productName = "Space Drone with AsteriodsTests";
-			productReference = F7D9535430106AC7009D0539 /* Space Drone with AsteriodsTests.xctest */;
+			productReference = F7D9535430106AC7009D0539 /* Space Drone StellarTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		F7D9535D30106AC8009D0539 /* Space Drone with AsteriodsUITests */ = {
+		F7D9535D30106AC8009D0539 /* Space Drone StellarUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = F7D9536E30106AC8009D0539 /* Build configuration list for PBXNativeTarget "Space Drone with AsteriodsUITests" */;
+			buildConfigurationList = F7D9536E30106AC8009D0539 /* Build configuration list for PBXNativeTarget "Space Drone StellarUITests" */;
 			buildPhases = (
 				F7D9535A30106AC8009D0539 /* Sources */,
 				F7D9535B30106AC8009D0539 /* Frameworks */,
@@ -160,13 +160,13 @@
 				F7D9536030106AC8009D0539 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				F7D9536130106AC8009D0539 /* Space Drone with AsteriodsUITests */,
+				F7D9536130106AC8009D0539 /* Space Drone Stellar UITests */,
 			);
-			name = "Space Drone with AsteriodsUITests";
+			name = "Space Drone StellarUITests";
 			packageProductDependencies = (
 			);
 			productName = "Space Drone with AsteriodsUITests";
-			productReference = F7D9535E30106AC8009D0539 /* Space Drone with AsteriodsUITests.xctest */;
+			productReference = F7D9535E30106AC8009D0539 /* Space Drone StellarUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
@@ -192,7 +192,7 @@
 					};
 				};
 			};
-			buildConfigurationList = F7D9533D30106AC6009D0539 /* Build configuration list for PBXProject "Space Drone with Asteriods" */;
+			buildConfigurationList = F7D9533D30106AC6009D0539 /* Build configuration list for PBXProject "Space Drone Stellar" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -206,9 +206,9 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				F7D9534130106AC6009D0539 /* Space Drone with Asteriods */,
-				F7D9535330106AC7009D0539 /* Space Drone with AsteriodsTests */,
-				F7D9535D30106AC8009D0539 /* Space Drone with AsteriodsUITests */,
+				F7D9534130106AC6009D0539 /* Space Drone Stellar */,
+				F7D9535330106AC7009D0539 /* Space Drone StellarTests */,
+				F7D9535D30106AC8009D0539 /* Space Drone StellarUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -265,12 +265,12 @@
 /* Begin PBXTargetDependency section */
 		F7D9535630106AC7009D0539 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = F7D9534130106AC6009D0539 /* Space Drone with Asteriods */;
+			target = F7D9534130106AC6009D0539 /* Space Drone Stellar */;
 			targetProxy = F7D9535530106AC7009D0539 /* PBXContainerItemProxy */;
 		};
 		F7D9536030106AC8009D0539 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = F7D9534130106AC6009D0539 /* Space Drone with Asteriods */;
+			target = F7D9534130106AC6009D0539 /* Space Drone Stellar */;
 			targetProxy = F7D9535F30106AC8009D0539 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -407,7 +407,7 @@
 				DEVELOPMENT_TEAM = D79GCWU2TB;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Space Drones Stellar";
+				INFOPLIST_KEY_CFBundleDisplayName = "Space Drone Stellar";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -441,7 +441,7 @@
 				DEVELOPMENT_TEAM = D79GCWU2TB;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Space Drones Stellar";
+				INFOPLIST_KEY_CFBundleDisplayName = "Space Drone Stellar";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.action-games";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -483,7 +483,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Space Drone with Asteriods.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Space Drone with Asteriods";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Space Drone Stellar.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Space Drone Stellar";
 			};
 			name = Debug;
 		};
@@ -505,7 +505,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Space Drone with Asteriods.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Space Drone with Asteriods";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Space Drone Stellar.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Space Drone Stellar";
 			};
 			name = Release;
 		};
@@ -552,7 +552,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		F7D9533D30106AC6009D0539 /* Build configuration list for PBXProject "Space Drone with Asteriods" */ = {
+		F7D9533D30106AC6009D0539 /* Build configuration list for PBXProject "Space Drone Stellar" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				F7D9536630106AC8009D0539 /* Debug */,
@@ -561,7 +561,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		F7D9536830106AC8009D0539 /* Build configuration list for PBXNativeTarget "Space Drone with Asteriods" */ = {
+		F7D9536830106AC8009D0539 /* Build configuration list for PBXNativeTarget "Space Drone Stellar" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				F7D9536930106AC8009D0539 /* Debug */,
@@ -570,7 +570,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		F7D9536B30106AC8009D0539 /* Build configuration list for PBXNativeTarget "Space Drone with AsteriodsTests" */ = {
+		F7D9536B30106AC8009D0539 /* Build configuration list for PBXNativeTarget "Space Drone StellarTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				F7D9536C30106AC8009D0539 /* Debug */,
@@ -579,7 +579,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		F7D9536E30106AC8009D0539 /* Build configuration list for PBXNativeTarget "Space Drone with AsteriodsUITests" */ = {
+		F7D9536E30106AC8009D0539 /* Build configuration list for PBXNativeTarget "Space Drone StellarUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				F7D9536F30106AC8009D0539 /* Debug */,
