@@ -76,7 +76,8 @@ final class GameState: ObservableObject {
     // ============================================================
 
     private var fireTimer: Timer?
-    private var gameTimer: Timer?
+    private var displayLink: CADisplayLink?
+    private var lastFrameTimestamp: CFTimeInterval?
     private var shieldTimer: Timer?
 
     private let dt: CGFloat = 1.0 / 60.0
@@ -94,20 +95,14 @@ final class GameState: ObservableObject {
     // ============================================================
 
     func start() {
-        guard gameTimer == nil else {
+        guard displayLink == nil else {
             return
         }
-
-        gameTimer = Timer.scheduledTimer(
-            withTimeInterval: 1.0 / 60.0,
-            repeats: true
-        ) { [weak self] _ in
-
-            Task { @MainActor in
-                self?.tick()
-            }
-        }
+        lastFrameTimestamp = nil
+        displayLink = CADisplayLink(target: self, selector: #selector(frameUpdate))
+        displayLink?.add(to: .main, forMode: .default)
     }
+    
     func addPendingExplosion(
         x: CGFloat,y: CGFloat,z: CGFloat,
         
@@ -126,13 +121,12 @@ final class GameState: ObservableObject {
     // MAIN GAME LOOP
     // ============================================================
 
-    func tick() {
+    func tick(dt: CGFloat) {
 
         guard !gameOver else {
             stopFiring()
             return
         }
-        
 
         let deltaTime = dt
 
@@ -430,8 +424,9 @@ final class GameState: ObservableObject {
 
         stopFiring()
 
-        gameTimer?.invalidate()
-        gameTimer = nil
+        displayLink?.invalidate()
+        displayLink = nil
+        lastFrameTimestamp = nil
 
         shieldTimer?.invalidate()
         shieldTimer = nil
@@ -492,6 +487,17 @@ final class GameState: ObservableObject {
         //currentSection = .ocean
 
         start()
+    }
+    
+    @objc private func frameUpdate(_ link: CADisplayLink) {
+        if lastFrameTimestamp == nil {
+            lastFrameTimestamp = link.timestamp
+            return
+        }
+        let dt = CGFloat(link.timestamp - (lastFrameTimestamp ?? link.timestamp))
+        lastFrameTimestamp = link.timestamp
+        let clampedDT = min(dt, 0.05) // Cap dt to avoid big jumps
+        tick(dt: clampedDT)
     }
 }
 

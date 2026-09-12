@@ -200,23 +200,18 @@ final class OceanSceneWorld {
     }
   
     private func setupCamera() {
-           let cam = SCNCamera()
-           cam.zNear = 0.05
-           cam.zFar = 200
-           cam.fieldOfView = 72
-           camera.camera = cam
-           camera.position = SCNVector3(0, 0.3, -2.8)
-           camera.eulerAngles.y = .pi   // look down +Z
+        let cam = SCNCamera()
+        cam.zNear = 0.05
+        cam.zFar = 200
+        cam.fieldOfView = 72
+        camera.camera = cam
 
-           // The camera is a child of the ship root, so it automatically
-           // inherits the ship's world position/rotation every frame
-           // without needing to be manually re-synced in sync(). This
-           // position (0, 0.3, -2.8) is now a fixed LOCAL offset from
-           // the ship, not a world position.
-           shipRoot.addChildNode(camera)
+        camera.position = SCNVector3(0, 0.3, -2.8)
+        camera.eulerAngles.y = .pi   // ← this reverses the camera horizontally
 
-           setupCockpitCannon()
-       }
+        shipRoot.addChildNode(camera)
+        setupCockpitCannon()
+    }
     private func setupCockpitCannon() {
         cockpitCannonNode.removeFromParentNode()
         cannonBarrelPivot.removeFromParentNode()
@@ -467,31 +462,15 @@ final class OceanSceneWorld {
         let shipPosition =
             gameState.spaceShip.position
 
-        // Ensure the ship's Y position is at or above ocean surface.
-        // This sets the initial ship position above the ocean surface.
-        shipRoot.position = SCNVector3(shipPosition.x, max(shipPosition.y, oceanSurfaceY), shipPosition.z)
+        // The ocean camera faces +Z through a 180° Y rotation.
+        // Negating rendered X keeps screen-left/navigation aligned
+        // without changing the shared tunnel movement model.
+        shipRoot.position = SCNVector3(
+            -shipPosition.x,
+            max(shipPosition.y, oceanSurfaceY),
+            shipPosition.z
+        )
 
-
-        // Ship rotation around the tunnel is retained for
-        // compatibility with the tunnel section.
-
-        //shipRoot.eulerAngles.z =
-         //   Float(
-        //        gameState.spaceShip.lateralAngle
-        //    )
-   
-     
-            // Ocean camera stays level.
-
-           // camera.eulerAngles.x = 0
-          //  camera.eulerAngles.y = .pi
-         //   camera.eulerAngles.z = 0
-
-         //   camera.position = SCNVector3(
-        //        0,
-       //         0.3,
-        //        -2.8
-        //    )
 
     
 

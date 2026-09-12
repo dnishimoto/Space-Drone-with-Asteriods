@@ -339,16 +339,15 @@ final class AsteroidManager {
         // in front of the current ship position.
         // ====================================================
 
-        let minimumForwardDistance:
-            CGFloat = 35.0
+        let minimumForwardDistance: CGFloat = 35.0
 
-        let additionalDistance =
-            CGFloat.random(
-                in: 0.0...30.0
-            )
+        let additionalDistance = CGFloat.random(
+            in: 0.0...30.0
+        )
 
         let spawnZ =
-            minimumForwardDistance
+        CGFloat(game.spaceShip.position.z)
+            + minimumForwardDistance
             + additionalDistance
 
         // ====================================================

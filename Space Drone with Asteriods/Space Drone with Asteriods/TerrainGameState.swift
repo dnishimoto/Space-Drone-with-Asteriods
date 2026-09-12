@@ -11,7 +11,7 @@ enum TerrainGameState {
     private static let sharkActivationDistance: Float = 180.0
     private static let enemyActivationDistance: Float = 300.0
 
-    private static let sharkCollisionRadius: Float = 2.7
+    private static let sharkCollisionRadius: Float = 0.1
     private static let laserCollisionRadius: Float = 1.5
 
     // =====================================================================

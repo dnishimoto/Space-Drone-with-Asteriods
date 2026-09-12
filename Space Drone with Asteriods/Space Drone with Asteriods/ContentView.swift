@@ -669,6 +669,8 @@ struct ContentView: View {
 
     @StateObject private var game =
         GameState()
+    
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var showVolumeDialog =
         false
@@ -872,7 +874,7 @@ struct ContentView: View {
                             // COLLISION SOUND
                             // ====================================================
 
-                            Toggle(
+                            /*Toggle(
                                 "Collision Sound",
                                 isOn:
                                     $game.playCollisionSound
@@ -880,6 +882,7 @@ struct ContentView: View {
                             .toggleStyle(.switch)
                             .foregroundColor(.white)
                             .padding(.top, 6)
+                             */
                         }
 
                         Spacer()
@@ -892,7 +895,7 @@ struct ContentView: View {
                             // ====================================================
                             // VOLUME
                             // ====================================================
-
+/*
                             Button(
                                 action: {
                                     showVolumeDialog = true
@@ -908,7 +911,7 @@ struct ContentView: View {
                                     .system(size: 22)
                                 )
                             }
-
+*/
                             // ====================================================
                             // RADAR
                             // ====================================================
@@ -1106,7 +1109,7 @@ struct ContentView: View {
         // ============================================================
         // VOLUME SHEET
         // ============================================================
-
+/*
         .sheet(
             isPresented:
                 $showVolumeDialog
@@ -1117,12 +1120,21 @@ struct ContentView: View {
                     $game.volume
             )
         }
-
+*/
         .preferredColorScheme(
             .dark
         )
 
         .statusBarHidden()
+
+        // Pause/resume game timers/animations when app changes state
+        .onChange(of: scenePhase) { newPhase in
+            if newPhase != .active {
+                game.stopAll() // Pauses game loop and timers when inactive or background
+            } else if !game.gameOver {
+                game.start() // Resumes game loop if not game over
+            }
+        }
     }
 
 

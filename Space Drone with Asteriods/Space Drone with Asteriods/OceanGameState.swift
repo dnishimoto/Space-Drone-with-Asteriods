@@ -530,7 +530,7 @@ enum OceanGameState {
 
 
             let asteroidPosition =
-                asteroid.tunnelPosition
+            asteroid.oceanPosition
 
 
             let spaceshipCollisionRadius:
@@ -543,10 +543,10 @@ enum OceanGameState {
                 spaceshipCollisionRadius = 0.1
 
             case .medium:
-                spaceshipCollisionRadius = 0.4
+                spaceshipCollisionRadius = 0.2
 
             case .large:
-                spaceshipCollisionRadius = 0.6
+                spaceshipCollisionRadius = 0.3
             }
 
 
