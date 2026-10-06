@@ -1,38 +1,63 @@
 
 //
-// AlienShipBattleScene.swift
-//
-// Manages a fleet of AlienShipState enemy ships.
-// The fleet is updated using cellular-automaton rules.
-//
-
-//
-//  AlienShipBattleScene.swift
+//  AlienShipBattleSceneWorld.swift
 //
 //  Alien fleet cellular-automaton battle world.
-//  Includes:
-//  - 3D alien fleet
-//  - Local CA state updates
-//  - Fleet spawning
-//  - Alien movement
-//  - Cockpit cannon
-//  - Muzzle node for projectile firing
+//
+//  Responsibilities:
+//  - Owns the single alien fleet and the alien projectiles
+//  - Steps the fleet from GameState.update() (see step(dt:game:))
+//  - Follows the player ship with the camera
+//  - Aims the cockpit cannon and publishes its muzzle position and
+//    world direction to GameState so shootLaser() fires from the
+//    end of the barrel
+//  - Resolves player cannon lasers against the aliens
+//  - Renders ships and projectiles (cached nodes, no per-frame rebuild)
+//
+//  Coordinates:
+//  Everything is in WORLD space, the same space as
+//  gameState.spaceShip.position and gameState.playerLasers. The
+//  camera looks down +Z, exactly like the Terrain scene.
 //
 
 import Foundation
 import SceneKit
 import UIKit
+import simd
 
 @MainActor
 final class AlienShipBattleSceneWorld {
 
-    private var lastSyncTime: TimeInterval = CACurrentMediaTime()
-    
     let scene = SCNScene()
 
     let camera = SCNNode()
 
     private let fleetContainer = SCNNode()
+
+    private let projectileContainer = SCNNode()
+
+    // ============================================================
+    // TUNING
+    // ============================================================
+
+    /// Same camera relationship as the Terrain scene
+    /// (camera sits just behind and above the ship position).
+    private let cameraOffset = SCNVector3(0, 0.3, -2.8)
+
+    /// Fraction of the player's forward speed the fleet keeps, so the
+    /// battle stays in front of the player instead of being flown
+    /// through in a few seconds. Disabled ships do not keep pace and
+    /// are left behind.
+    private static let convoyFactor: Float = 0.85
+
+    /// Ships further than this behind the player are removed.
+    private static let cullBehind: Float = 10.0
+
+    /// Ships further than this ahead are stale (e.g. after a restart).
+    private static let cullAhead: Float = 120.0
+
+    /// Seconds between a finished battle and the next wave.
+    private static let waveDelay: CGFloat = 2.0
 
     // ============================================================
     // COCKPIT CANNON
@@ -52,9 +77,35 @@ final class AlienShipBattleSceneWorld {
 
     private(set) var fleet: [AlienShipState] = []
 
+    private(set) var projectiles: [Projectile] = []
+
     private var nextFleetID: Int = 0
 
+    private var waveTimer: CGFloat = 0.0
+
+    private var hasAnchored = false
+
     let maxFleetSize: Int
+
+    // ============================================================
+    // RENDER CACHES
+    // ============================================================
+
+    private var shipNodes: [Int: SCNNode] = [:]
+
+    private var shipVisualState:
+        [Int: AlienShipState.BehavioralState] = [:]
+
+    private var projectileNodes: [SCNNode] = []
+
+    private lazy var alphaLaserGeometry =
+        makeLaserGeometry(color: .magenta)
+
+    private lazy var betaLaserGeometry =
+        makeLaserGeometry(color: .orange)
+
+    private lazy var neutralLaserGeometry =
+        makeLaserGeometry(color: .white)
 
     // ============================================================
     // INITIALIZATION
@@ -67,9 +118,7 @@ final class AlienShipBattleSceneWorld {
             fleetSize
         )
 
-        // ========================================================
         // CAMERA
-        // ========================================================
 
         let cam = SCNCamera()
 
@@ -79,64 +128,63 @@ final class AlienShipBattleSceneWorld {
 
         camera.camera = cam
 
-        camera.position = SCNVector3(
-            0,
-            0.3,
-            -2.8
-        )
+        camera.position = cameraOffset
 
+        // Look down +Z.
         camera.eulerAngles = SCNVector3(
             0,
-            Double.pi,
+            Float.pi,
             0
         )
 
         scene.rootNode.addChildNode(camera)
 
-        // ========================================================
-        // FLEET CONTAINER
-        // ========================================================
+        // CONTAINERS
 
         scene.rootNode.addChildNode(
             fleetContainer
         )
 
-        // ========================================================
+        scene.rootNode.addChildNode(
+            projectileContainer
+        )
+
         // COCKPIT CANNON
-        // ========================================================
 
         setupCockpitCannon()
 
-        // ========================================================
         // INITIAL FLEET
-        // ========================================================
+        //
+        // The ship position is not known yet; the first sync(with:)
+        // re-anchors the fleet around the real ship position.
 
-        spawnFleet()
+        spawnFleet(
+            around: SCNVector3(0, 0, 0)
+        )
 
         renderFleet()
     }
 
     // ============================================================
     // COCKPIT CANNON
+    //
+    // Same hierarchy as the Terrain and Ocean scenes:
+    //
+    //   camera
+    //    └── cockpitCannonNode
+    //         └── cannonBarrelPivot   (rear hinge, rotated by aim)
+    //              └── cannonBarrel   (cylinder, rotated -90° about X)
+    //                   └── muzzleNode (barrel tip, rotated +90° back)
     // ============================================================
 
     private func setupCockpitCannon() {
 
-        // ========================================================
-        // REMOVE EXISTING CANNON NODES
-        // ========================================================
-
         cockpitCannonNode.removeFromParentNode()
-
         cannonBarrelPivot.removeFromParentNode()
-
         cannonBarrel.removeFromParentNode()
-
         muzzleNode.removeFromParentNode()
 
-        // ========================================================
         // COCKPIT ROOT
-        // ========================================================
 
         camera.addChildNode(
             cockpitCannonNode
@@ -154,9 +202,7 @@ final class AlienShipBattleSceneWorld {
             0
         )
 
-        // ========================================================
         // REAR-END HINGE
-        // ========================================================
 
         cannonBarrelPivot.position = SCNVector3(
             0,
@@ -174,9 +220,7 @@ final class AlienShipBattleSceneWorld {
             cannonBarrelPivot
         )
 
-        // ========================================================
         // BARREL
-        // ========================================================
 
         let barrelLength: Float = 0.72
 
@@ -187,6 +231,8 @@ final class AlienShipBattleSceneWorld {
             radius: 0.055,
             height: CGFloat(barrelLength)
         )
+
+        barrelGeometry.radialSegmentCount = 16
 
         barrelGeometry.firstMaterial?.diffuse.contents =
             UIColor.darkGray
@@ -203,19 +249,10 @@ final class AlienShipBattleSceneWorld {
         cannonBarrel.geometry =
             barrelGeometry
 
-        // ========================================================
-        // RESET PIVOT
-        // ========================================================
-
         cannonBarrel.pivot =
             SCNMatrix4Identity
 
-        // ========================================================
-        // BARREL ORIENTATION
-        // ========================================================
-
-        // SCNCylinder extends along local Y.
-        //
+        // SCNCylinder extends along local +Y.
         // Rotate +Y toward camera-forward (-Z).
 
         cannonBarrel.eulerAngles = SCNVector3(
@@ -224,9 +261,7 @@ final class AlienShipBattleSceneWorld {
             0
         )
 
-        // ========================================================
-        // BARREL POSITION
-        // ========================================================
+        // Barrel center is half its length forward of the hinge.
 
         cannonBarrel.position = SCNVector3(
             0,
@@ -238,18 +273,24 @@ final class AlienShipBattleSceneWorld {
             cannonBarrel
         )
 
-        // ========================================================
         // MUZZLE
-        // ========================================================
+        //
+        // The muzzle sits at the TIP of the barrel (local +Y of the
+        // cylinder) and is rotated +90° about X to cancel the
+        // barrel's -90°, so the muzzle's local -Z is the true
+        // firing direction.
+        //
+        // (It used to sit at local -Z with no rotation, which put it
+        // mid-barrel and pointing straight down.)
 
         muzzleNode.position = SCNVector3(
             0,
-            0,
-            -halfLength
+            halfLength,
+            0
         )
 
         muzzleNode.eulerAngles = SCNVector3(
-            0,
+            Float.pi / 2.0,
             0,
             0
         )
@@ -260,7 +301,61 @@ final class AlienShipBattleSceneWorld {
     }
 
     // ============================================================
-    // MUZZLE POSITION
+    // CANNON AIM
+    //
+    // Same convention as the Terrain scene. Publishes the muzzle
+    // position and world-space direction that
+    // GameState.shootLaser() captures when it fires.
+    //
+    // Model-tree transforms are used (not .presentation) so the
+    // values reflect the camera and aim set this very frame.
+    // ============================================================
+
+    private func updateCannonAim(
+        game: GameState
+    ) {
+
+        let yaw =
+            Float(game.cannonAzimuth)
+
+        let pitch =
+            Float(game.cannonElevation)
+
+        cannonBarrelPivot.eulerAngles =
+            SCNVector3(
+                pitch,
+                -yaw,
+                0
+            )
+
+        game.cannonMuzzleWorldPosition =
+            muzzleNode.worldPosition
+
+        let worldDirection =
+            muzzleNode.simdWorldOrientation.act(
+                SIMD3<Float>(0, 0, -1)
+            )
+
+        let length = sqrt(
+            worldDirection.x * worldDirection.x +
+            worldDirection.y * worldDirection.y +
+            worldDirection.z * worldDirection.z
+        )
+
+        guard length > 0.0001 else {
+            return
+        }
+
+        game.cannonWorldDirection =
+            SCNVector3(
+                worldDirection.x / length,
+                worldDirection.y / length,
+                worldDirection.z / length
+            )
+    }
+
+    // ============================================================
+    // MUZZLE ACCESSORS
     // ============================================================
 
     var muzzleWorldPosition: SCNVector3 {
@@ -268,72 +363,66 @@ final class AlienShipBattleSceneWorld {
         muzzleNode.worldPosition
     }
 
-    // ============================================================
-    // MUZZLE DIRECTION
-    // ============================================================
-
     var muzzleWorldDirection: SCNVector3 {
 
-        let origin =
-            muzzleNode.presentation.worldPosition
-
-        let forwardPoint =
-            muzzleNode.presentation.convertPosition(
-                SCNVector3(
-                    0,
-                    0,
-                    -1
-                ),
-                to: nil
-            )
-
-        let dx =
-            forwardPoint.x - origin.x
-
-        let dy =
-            forwardPoint.y - origin.y
-
-        let dz =
-            forwardPoint.z - origin.z
+        let d = muzzleNode.simdWorldOrientation.act(
+            SIMD3<Float>(0, 0, -1)
+        )
 
         let length = sqrt(
-            dx * dx +
-            dy * dy +
-            dz * dz
+            d.x * d.x +
+            d.y * d.y +
+            d.z * d.z
         )
 
         guard length > 0.0001 else {
-            return SCNVector3(
-                0,
-                0,
-                -1
-            )
+            return SCNVector3(0, 0, 1)
         }
 
         return SCNVector3(
-            dx / length,
-            dy / length,
-            dz / length
+            d.x / length,
+            d.y / length,
+            d.z / length
+        )
+    }
+
+    // ============================================================
+    // CAMERA FOLLOWS THE PLAYER SHIP
+    // ============================================================
+
+    private func updateCamera(
+        game: GameState
+    ) {
+
+        let ship = game.spaceShip.position
+
+        camera.position = SCNVector3(
+            ship.x + cameraOffset.x,
+            ship.y + cameraOffset.y,
+            ship.z + cameraOffset.z
         )
     }
 
     // ============================================================
     // SPAWN FLEET
+    //
+    // Spawns a fresh wave ahead of `anchor` (the player ship), half
+    // alpha and half beta so the two factions fight each other.
     // ============================================================
 
-    func spawnFleet() {
+    func spawnFleet(
+        around anchor: SCNVector3
+    ) {
 
         fleet.removeAll(
             keepingCapacity: true
         )
 
-        nextFleetID = 0
+        projectiles.removeAll(
+            keepingCapacity: true
+        )
 
-        for _ in 0..<maxFleetSize {
-
-            // ====================================================
-            // RANDOM FORMATION POSITION
-            // ====================================================
+        for index in 0..<maxFleetSize {
 
             let angle =
                 Float.random(
@@ -345,73 +434,33 @@ final class AlienShipBattleSceneWorld {
                     in: 8.0...18.0
                 )
 
-            let x =
-                cos(angle) * radius
-
-            let y =
-                sin(angle) * radius
-
-            let z =
-                Float.random(
-                    in: 35.0...60.0
-                )
-
-            // ====================================================
-            // INITIAL VELOCITY
-            // ====================================================
-
-            let velocity = SCNVector3(
-                Float.random(
-                    in: (-0.5)...0.5
-                ),
-                Float.random(
-                    in: (-0.5)...0.5
-                ),
-                Float.random(
-                    in: (-1.5)...(-0.5)
-                )
+            let position = SCNVector3(
+                anchor.x + cos(angle) * radius,
+                anchor.y + sin(angle) * radius,
+                anchor.z + Float.random(in: 35.0...60.0)
             )
 
-            // ====================================================
-            // FACTION
-            // ====================================================
+            let velocity = SCNVector3(
+                Float.random(in: (-0.5)...0.5),
+                Float.random(in: (-0.5)...0.5),
+                Float.random(in: (-1.5)...(-0.5))
+            )
 
             let faction:
                 AlienShipState.Faction =
-                nextFleetID % 2 == 0
+                index % 2 == 0
                 ? .alpha
                 : .beta
 
-            // ====================================================
-            // CREATE SHIP
-            // ====================================================
+            // fleetID is never reused, so projectile ownerIDs and
+            // cached render nodes can never alias an older ship.
 
             let ship =
                 AlienShipState(
                     fleetID: nextFleetID,
-
-                    position: SCNVector3(
-                        x,
-                        y,
-                        z
-                    ),
-
+                    position: position,
                     velocity: velocity,
-
-                    hullIntegrity: 1.0,
-
-                    shieldEnergy: 1.0,
-
-                    weaponEnergy: 1.0,
-
-                    sensorRange: 15.0,
-
-                    maneuverability: 1.0,
-
                     faction: faction,
-
-                    target: nil,
-
                     behavioralState: .approaching
                 )
 
@@ -421,224 +470,516 @@ final class AlienShipBattleSceneWorld {
                 ship
             )
         }
+
+        waveTimer = 0.0
     }
 
     // ============================================================
-    // CELLULAR AUTOMATON UPDATE
+    // STEP
+    //
+    // Called every frame from GameState.update() through
+    // AlienShipState.update(gameState:dt:).
     // ============================================================
 
-    func update(
+    func step(
         dt: CGFloat,
-        playerAngle: Double,
-        shipSpeed: CGFloat
+        game: GameState
     ) {
 
         guard dt > 0 else {
             return
         }
 
+        let dtF = Float(dt)
+
+        let shipPosition =
+            game.spaceShip.position
+
+        let shipSpeed =
+            Float(game.spaceShip.forwardSpeed)
+
         // ========================================================
-        // SYNCHRONOUS CA SNAPSHOT
+        // 1. CELLULAR AUTOMATON GENERATION
+        //
+        // Every ship reads the same snapshot of the previous
+        // generation, then updates only itself.
         // ========================================================
 
-        // Every alien evaluates the same previous-generation
-        // fleet state. This prevents update-order bias.
-
-        let currentFleet = fleet
-
-        // ========================================================
-        // LOCAL CA RULES
-        // ========================================================
-
-        for ship in currentFleet
-        where !ship.destroyed {
-
-            ship.update(
-                allShips: currentFleet,
-                obstacles: [],
-                projectiles: [],
-                debris: []
-            )
+        let snapshot = fleet.map {
+            $0.snapshot
         }
-
-        // ========================================================
-        // MOVEMENT
-        // ========================================================
 
         for ship in fleet
         where !ship.destroyed {
 
-            // Player/world forward motion.
-
-            ship.position.z -=
-                Float(
-                    shipSpeed *
-                    dt *
-                    0.85
-                )
-
-            // Alien lateral movement.
-
-            ship.position.x +=
-                ship.velocity.x *
-                Float(dt)
-
-            // Alien vertical movement.
-
-            ship.position.y +=
-                ship.velocity.y *
-                Float(dt)
-
-            // Alien forward/backward movement.
-
-            ship.position.z +=
-                ship.velocity.z *
-                Float(dt)
+            if let shot = ship.update(
+                allShips: snapshot,
+                obstacles: [],
+                dt: dt
+            ) {
+                projectiles.append(shot)
+            }
         }
 
         // ========================================================
-        // REMOVE DESTROYED / PASSED SHIPS
+        // 2. CONVOY MOTION
+        //
+        // The ship's own velocity was already integrated inside
+        // AlienShipState.update. This only adds the part that keeps
+        // the fleet in the player's frame. Disabled ships are dead
+        // in the water and get left behind.
         // ========================================================
+
+        for ship in fleet
+        where !ship.destroyed && !ship.disabled {
+
+            ship.position.z +=
+                shipSpeed * dtF * Self.convoyFactor
+        }
+
+        // ========================================================
+        // 3. HITS
+        // ========================================================
+
+        advanceAlienProjectiles(dt: dtF)
+
+        resolvePlayerLasers(
+            game: game,
+            dt: dtF
+        )
+
+        // ========================================================
+        // 4. CLEAN UP
+        // ========================================================
+
+        let minimumZ = shipPosition.z - Self.cullBehind
+        let maximumZ = shipPosition.z + Self.cullAhead
 
         fleet.removeAll { ship in
 
             ship.destroyed ||
-            ship.position.z < -10.0
+            ship.position.z < minimumZ ||
+            ship.position.z > maximumZ
+        }
+
+        projectiles.removeAll { shot in
+
+            shot.position.z < minimumZ ||
+            shot.position.z > maximumZ
         }
 
         // ========================================================
-        // REINFORCEMENT
+        // 5. NEXT WAVE
+        //
+        // The battle is over when fewer than two factions still have
+        // an active (not disabled) ship. Disabled hulks do not keep
+        // a battle alive.
         // ========================================================
 
-        if fleet.isEmpty {
+        var activeFactions = Set<AlienShipState.Faction>()
 
-            spawnFleet()
+        for ship in fleet
+        where !ship.destroyed && !ship.disabled {
+
+            activeFactions.insert(ship.faction)
         }
 
-        // ========================================================
-        // RENDER
-        // ========================================================
+        if activeFactions.count < 2 {
 
-        renderFleet()
+            waveTimer += dt
+
+            if waveTimer >= Self.waveDelay {
+
+                spawnFleet(
+                    around: shipPosition
+                )
+            }
+
+        } else {
+
+            waveTimer = 0.0
+        }
+    }
+
+    // ============================================================
+    // ALIEN PROJECTILES
+    //
+    // Moves every alien shot and resolves it against enemy ships
+    // with a swept (segment vs sphere) test so fast shots cannot
+    // tunnel through a ship between frames.
+    // ============================================================
+
+    private func advanceAlienProjectiles(
+        dt: Float
+    ) {
+
+        var survivors: [Projectile] = []
+
+        for var shot in projectiles {
+
+            let start = shot.position
+
+            shot.position = AlienShipState.add(
+                start,
+                AlienShipState.multiply(
+                    shot.velocity,
+                    dt
+                )
+            )
+
+            shot.lifetime -= dt
+
+            guard shot.lifetime > 0.0 else {
+                continue
+            }
+
+            var consumed = false
+
+            for ship in fleet
+            where !ship.destroyed &&
+                  ship.fleetID != shot.ownerID &&
+                  AlienShipState.projectileHurts(
+                    source: shot.sourceFaction,
+                    target: ship.faction
+                  ) {
+
+                let miss =
+                    AlienShipState.distanceToSegment(
+                        ship.position,
+                        start,
+                        shot.position
+                    )
+
+                if miss <= ship.collisionRadius {
+
+                    ship.applyDamage(shot.damage)
+
+                    consumed = true
+
+                    break
+                }
+            }
+
+            if !consumed {
+                survivors.append(shot)
+            }
+        }
+
+        projectiles = survivors
+    }
+
+    // ============================================================
+    // PLAYER CANNON LASERS
+    //
+    // gameState.playerLasers are world-space and are advanced later
+    // in GameState.update(), so each laser covers the segment from
+    // where it was last frame to where it is now. Lasers that hit
+    // are removed so one shot cannot hit twice.
+    // ============================================================
+
+    private func resolvePlayerLasers(
+        game: GameState,
+        dt: Float
+    ) {
+
+        guard !game.playerLasers.isEmpty else {
+            return
+        }
+
+        let travel = Float(Laser.speed) * dt
+
+        var consumedIndices: [Int] = []
+
+        for index in game.playerLasers.indices {
+
+            let laser = game.playerLasers[index]
+
+            guard laser.isPlayerLaser else {
+                continue
+            }
+
+            let end = laser.worldPosition()
+
+            let start = AlienShipState.subtract(
+                end,
+                AlienShipState.multiply(
+                    laser.direction,
+                    travel
+                )
+            )
+
+            for ship in fleet
+            where !ship.destroyed {
+
+                let miss =
+                    AlienShipState.distanceToSegment(
+                        ship.position,
+                        start,
+                        end
+                    )
+
+                if miss <= ship.collisionRadius + 0.15 {
+
+                    ship.applyDamage(
+                        AlienShipState.playerLaserDamage
+                    )
+
+                    consumedIndices.append(index)
+
+                    break
+                }
+            }
+        }
+
+        for index in consumedIndices.reversed() {
+
+            game.playerLasers.remove(at: index)
+        }
     }
 
     // ============================================================
     // RENDER FLEET
+    //
+    // Nodes are cached per fleetID and only moved each frame
+    // (the old version destroyed and rebuilt every node every frame).
     // ============================================================
 
     func renderFleet() {
 
-        // Remove previous visual representation.
-
-        fleetContainer.childNodes.forEach {
-            $0.removeFromParentNode()
-        }
-
-        // ========================================================
-        // CREATE SHIP VISUALS
-        // ========================================================
+        var live = Set<Int>()
 
         for ship in fleet
         where !ship.destroyed {
 
-            // ====================================================
-            // SHIP BODY
-            // ====================================================
+            live.insert(ship.fleetID)
 
-            let geometry =
-                SCNSphere(
-                    radius: 0.5
-                )
+            let node =
+                shipNodes[ship.fleetID]
+                ?? makeShipNode(for: ship)
 
-            let material =
-                SCNMaterial()
+            node.position = ship.position
 
-            // ====================================================
-            // FACTION APPEARANCE
-            // ====================================================
-
-            switch ship.faction {
-
-            case .alpha:
-
-                material.diffuse.contents =
-                    UIColor.purple
-
-            case .beta:
-
-                material.diffuse.contents =
-                    UIColor.red
-
-            case .neutral:
-
-                material.diffuse.contents =
-                    UIColor.gray
-
-            case .unknown:
-
-                material.diffuse.contents =
-                    UIColor.white
-            }
-
-            material.emission.contents =
-                material.diffuse.contents
-
-            material.emission.intensity =
-                0.20
-
-            geometry.materials = [
-                material
-            ]
-
-            // ====================================================
-            // NODE
-            // ====================================================
-
-            let shipNode =
-                SCNNode(
-                    geometry: geometry
-                )
-
-            shipNode.position =
-                ship.position
-
-            fleetContainer.addChildNode(
-                shipNode
+            updateAppearance(
+                of: node,
+                for: ship
             )
+        }
+
+        for (id, node) in shipNodes
+        where !live.contains(id) {
+
+            node.removeFromParentNode()
+        }
+
+        shipNodes = shipNodes.filter {
+            live.contains($0.key)
+        }
+
+        shipVisualState = shipVisualState.filter {
+            live.contains($0.key)
+        }
+    }
+
+    private func makeShipNode(
+        for ship: AlienShipState
+    ) -> SCNNode {
+
+        let geometry =
+            SCNSphere(
+                radius: 0.5
+            )
+
+        geometry.materials = [
+            SCNMaterial()
+        ]
+
+        let node =
+            SCNNode(
+                geometry: geometry
+            )
+
+        fleetContainer.addChildNode(
+            node
+        )
+
+        shipNodes[ship.fleetID] = node
+
+        return node
+    }
+
+    /// Color shows faction; brightness shows what the ship is doing.
+    private func updateAppearance(
+        of node: SCNNode,
+        for ship: AlienShipState
+    ) {
+
+        guard shipVisualState[ship.fleetID]
+                != ship.behavioralState,
+              let material =
+                node.geometry?.firstMaterial
+        else {
+            return
+        }
+
+        shipVisualState[ship.fleetID] =
+            ship.behavioralState
+
+        let base: UIColor
+
+        switch ship.faction {
+
+        case .alpha:
+            base = .purple
+
+        case .beta:
+            base = .red
+
+        case .neutral:
+            base = .gray
+
+        case .unknown:
+            base = .white
+        }
+
+        switch ship.behavioralState {
+
+        case .disabled:
+
+            material.diffuse.contents = UIColor.darkGray
+            material.emission.contents = UIColor.black
+            material.emission.intensity = 0.0
+
+        case .attacking:
+
+            material.diffuse.contents = base
+            material.emission.contents = base
+            material.emission.intensity = 0.60
+
+        case .evading:
+
+            material.diffuse.contents = base
+            material.emission.contents = UIColor.white
+            material.emission.intensity = 0.80
+
+        case .retreating:
+
+            material.diffuse.contents = base
+            material.emission.contents = base
+            material.emission.intensity = 0.08
+
+        default:
+
+            material.diffuse.contents = base
+            material.emission.contents = base
+            material.emission.intensity = 0.20
         }
     }
 
     // ============================================================
-    // SYNCHRONIZE WITH GAME STATE
+    // RENDER PROJECTILES
+    //
+    // Small pool of nodes, one per live alien shot.
+    // ============================================================
+
+    private func makeLaserGeometry(
+        color: UIColor
+    ) -> SCNSphere {
+
+        let geometry =
+            SCNSphere(
+                radius: 0.12
+            )
+
+        let material =
+            SCNMaterial()
+
+        material.diffuse.contents = color
+        material.emission.contents = color
+        material.emission.intensity = 1.0
+
+        geometry.materials = [
+            material
+        ]
+
+        return geometry
+    }
+
+    func renderProjectiles() {
+
+        while projectileNodes.count < projectiles.count {
+
+            let node = SCNNode()
+
+            projectileContainer.addChildNode(
+                node
+            )
+
+            projectileNodes.append(
+                node
+            )
+        }
+
+        for (index, node) in projectileNodes.enumerated() {
+
+            guard index < projectiles.count else {
+
+                node.isHidden = true
+
+                continue
+            }
+
+            let shot = projectiles[index]
+
+            node.isHidden = false
+
+            node.position = shot.position
+
+            switch shot.sourceFaction {
+
+            case .alpha:
+                node.geometry = alphaLaserGeometry
+
+            case .beta:
+                node.geometry = betaLaserGeometry
+
+            default:
+                node.geometry = neutralLaserGeometry
+            }
+        }
+    }
+
+    // ============================================================
+    // SYNCHRONIZE WITH GAME STATE (render side)
+    //
+    // Does NOT simulate. It registers this world as THE fleet for
+    // the GameState, follows the ship with the camera, aims the
+    // cannon and draws the current state.
     // ============================================================
 
     func sync(
         with game: GameState
     ) {
 
-        let now = CACurrentMediaTime()
-        
-        let rawDT = now - lastSyncTime
-        lastSyncTime = now
+        if game.alienFleetManager !== self {
 
-        let dt =
-            CGFloat(
-                min(
-                    max(rawDT, 0.0),
-                    0.05
-                )
+            game.alienFleetManager = self
+        }
+
+        if !hasAnchored {
+
+            hasAnchored = true
+
+            spawnFleet(
+                around: game.spaceShip.position
             )
-        
-        update(
-            dt: dt,
+        }
 
-            playerAngle:
-                Double(
-                    game.spaceShip.lateralAngle
-                ),
+        updateCamera(game: game)
 
-            shipSpeed:
-                game.spaceShip.forwardSpeed
-        )
+        updateCannonAim(game: game)
+
+        renderFleet()
+
+        renderProjectiles()
     }
 }
