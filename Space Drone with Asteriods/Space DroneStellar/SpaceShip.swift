@@ -363,7 +363,86 @@ struct SpaceShip {
 
         verticalPosition = worldY
     }
+    mutating func updateAliens(dt: CGFloat) {
 
+        // ============================================================
+        // LEFT / RIGHT
+        // ============================================================
+
+        var worldX =
+            CGFloat(position.x) +
+            lateralInput *
+            terrainLateralSpeed *
+            dt
+
+        worldX = max(
+            terrainMinimumX,
+            min(
+                terrainMaximumX,
+                worldX
+            )
+        )
+
+        // ============================================================
+        // UP / DOWN
+        // ============================================================
+
+        //
+        // verticalInput:
+        //
+        //     +1 = up
+        //      0 = neutral
+        //     -1 = down
+        //
+        // Aliens can maneuver freely in the vertical axis.
+        //
+
+        let verticalSpeed: CGFloat = 12.0
+
+        var worldY =
+            CGFloat(position.y) +
+            verticalInput *
+            verticalSpeed *
+            dt
+
+        // Keep the ship above the minimum battle-space height.
+
+        let minimumAlienClearance: CGFloat = 2.0
+
+        worldY = max(
+            terrainBaseY + minimumAlienClearance,
+            worldY
+        )
+
+        // ============================================================
+        // FORWARD PROGRESS
+        // ============================================================
+
+        let worldZ =
+            CGFloat(position.z) +
+            forwardSpeed *
+            dt
+
+        // ============================================================
+        // FINAL WORLD POSITION
+        // ============================================================
+
+        position = SCNVector3(
+            Float(worldX),
+            Float(worldY),
+            Float(worldZ)
+        )
+
+        verticalPosition = worldY
+
+        // ============================================================
+        // PROGRESS
+        // ============================================================
+
+        progress +=
+            forwardSpeed *
+            dt
+    }
 
     // MARK: - Main Update
 
@@ -388,6 +467,8 @@ struct SpaceShip {
             updateTunnel(
                 dt: dt
             )
+        case .aliens:
+            updateAliens(dt:dt)
         }
     }
 }

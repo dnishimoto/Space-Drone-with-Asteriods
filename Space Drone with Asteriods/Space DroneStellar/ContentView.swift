@@ -18,6 +18,7 @@ final class GameSceneCoordinator: NSObject {
     let oceanWorld = OceanSceneWorld()
     let tunnelWorld = TunnelSceneWorld()
     let terrainWorld = TerrainSceneWorld()
+    let alienWorld = AlienShipBattleSceneWorld ()
 
     // ============================================================
     // ACTIVE WORLD
@@ -27,6 +28,7 @@ final class GameSceneCoordinator: NSObject {
         case tunnel
         case ocean
         case terrain
+        case aliens
     }
 
     private(set) var activeWorld: ActiveWorld = .tunnel
@@ -43,6 +45,8 @@ final class GameSceneCoordinator: NSObject {
             return tunnelWorld.scene
         case .terrain:
             return terrainWorld.scene
+        case .aliens:
+            return alienWorld.scene
         }
     }
 
@@ -58,6 +62,8 @@ final class GameSceneCoordinator: NSObject {
             return tunnelWorld.camera
         case .terrain:
             return terrainWorld.camera
+        case .aliens:
+            return alienWorld.camera
         }
     }
 
@@ -93,6 +99,9 @@ final class GameSceneCoordinator: NSObject {
             newActiveWorld = .tunnel
         case .terrain:
             newActiveWorld = .terrain
+        case .aliens
+            :
+            newActiveWorld = .aliens
         }
 
         let switched =
@@ -112,6 +121,8 @@ final class GameSceneCoordinator: NSObject {
             tunnelWorld.sync(with: game)
         case .terrain:
             terrainWorld.sync(with: game)
+        case .aliens:
+            alienWorld.sync(with: game)
         }
 
         // ========================================================
@@ -1149,6 +1160,8 @@ struct ContentView: View {
             
         case .terrain:
             return "TERRAIN"
+        case .aliens:
+            return "ALIEN BATTLE"
         }
     }
 

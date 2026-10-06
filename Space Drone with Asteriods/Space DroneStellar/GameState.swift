@@ -6,7 +6,8 @@ import Combine
 enum SceneSection {
     case tunnel
     case ocean
-    case terrain // Added for TERRAIN scene support
+    case terrain
+    case aliens
 }
 
 @MainActor
@@ -56,8 +57,8 @@ final class GameState: ObservableObject {
     // GAME
     // ============================================================
 
-    //@Published var score = 40_000
-    @Published var score = 0
+    @Published var score = 80_000
+    //@Published var score = 0
 
     @Published var gameOver = false
 
@@ -122,14 +123,12 @@ final class GameState: ObservableObject {
     // ============================================================
 
     func tick(dt: CGFloat) {
-
         guard !gameOver else {
             stopFiring()
             return
         }
 
         let deltaTime = dt
-
         let deadzone: CGFloat = 0.12
 
         // --------------------------------------------------------
@@ -137,16 +136,13 @@ final class GameState: ObservableObject {
         // --------------------------------------------------------
 
         let rawX = joystickVector.dx
+        let rawY = -joystickVector.dy
 
-        // --------------------------------------------------------
-        // PLAYER
-        // --------------------------------------------------------
         // --------------------------------------------------------
         // SECTION-SPECIFIC GAMEPLAY
         // --------------------------------------------------------
 
         switch currentSection {
-
         case .tunnel:
             TunnelGameState.update(
                 gameState: self,
@@ -158,53 +154,64 @@ final class GameState: ObservableObject {
                 gameState: self,
                 dt: deltaTime
             )
-            
-        case .terrain: // Added for TERRAIN scene support
+
+        case .terrain:
             TerrainGameState.update(
                 gameState: self,
                 dt: deltaTime
             )
 
+        case .aliens:
+            AlienShipState.update(
+                gameState: self,
+                dt: deltaTime
+            )
         }
-        
-        
+
+        // --------------------------------------------------------
+        // PLAYER INPUT
+        // --------------------------------------------------------
+
         spaceShip.lateralInput =
             abs(rawX) > deadzone
             ? Double(max(-1.0, min(1.0, rawX)))
             : 0.0
-
-        let rawY = -joystickVector.dy
 
         spaceShip.verticalInput =
             abs(rawY) > deadzone
             ? Double(max(-1.0, min(1.0, rawY)))
             : 0.0
 
-     
-        
-        spaceShip.update(dt: deltaTime,currentSection: currentSection)
-      
+        spaceShip.update(
+            dt: deltaTime,
+            currentSection: currentSection
+        )
 
         // --------------------------------------------------------
-        // Update all player lasers
+        // UPDATE PLAYER LASERS
         // --------------------------------------------------------
+
         for index in playerLasers.indices {
             playerLasers[index].update(
                 dt: deltaTime,
-                shipSpeed:
-                    Float(spaceShip.forwardSpeed)
+                shipSpeed: Float(spaceShip.forwardSpeed)
             )
         }
 
         // --------------------------------------------------------
-        // Update all enemy lasers
+        // UPDATE ENEMY LASERS
         // --------------------------------------------------------
+
         for index in enemyLasers.indices {
             enemyLasers[index].update(
                 dt: deltaTime,
                 shipSpeed: Float(spaceShip.forwardSpeed)
             )
         }
+
+        // --------------------------------------------------------
+        // REMOVE DISTANT LASERS
+        // --------------------------------------------------------
 
         let maxLaserDistance: CGFloat = 500.0
 
@@ -216,9 +223,9 @@ final class GameState: ObservableObject {
             laser.distance >= maxLaserDistance
         }
 
+        // Remove enemy lasers outside the playable depth range.
         enemyLasers.removeAll { laser in
-            laser.z > 90.0 ||
-            laser.z < -5.0
+            laser.z > 90.0 || laser.z < -5.0
         }
 
         // --------------------------------------------------------
@@ -239,22 +246,29 @@ final class GameState: ObservableObject {
         switch currentSection {
 
         case .tunnel:
-
             if score >= 20_000 {
                 currentSection = .ocean
             }
 
         case .ocean:
-
             if score >= 40_000 {
-                currentSection = .terrain // Added for TERRAIN scene support
+                currentSection = .terrain
             }
 
-        case .terrain: // Added for TERRAIN scene support
-            // Future progression logic for terrain can be added here
-            break
+        case .terrain:
+            if score >= 60_000 {
+                currentSection = .aliens
+            }
 
+        case .aliens:
+            if score >= 80_000 {
+                currentSection = .aliens
+            }
         }
+
+        // --------------------------------------------------------
+        // FRAME COUNTER
+        // --------------------------------------------------------
 
         frameTick &+= 1
     }
