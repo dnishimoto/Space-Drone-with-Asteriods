@@ -453,7 +453,7 @@ final class AlienShipBattleSceneWorld {
         for ship in currentFleet
         where !ship.destroyed {
 
-            ship.step(
+            ship.update(
                 allShips: currentFleet,
                 obstacles: [],
                 projectiles: [],
