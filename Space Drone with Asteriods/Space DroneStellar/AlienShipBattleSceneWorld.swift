@@ -36,6 +36,9 @@ final class AlienShipBattleSceneWorld {
 
     private let projectileContainer = SCNNode()
 
+    /// World-space container for the player's cannon lasers.
+    private let playerLaserContainer = SCNNode()
+
     // ============================================================
     // TUNING
     // ============================================================
@@ -98,6 +101,24 @@ final class AlienShipBattleSceneWorld {
 
     private var projectileNodes: [SCNNode] = []
 
+    private var playerLaserNodes: [SCNNode] = []
+
+    /// One shared beam geometry for every player laser (same size and
+    /// look as Laser.makeLaserNode, but not rebuilt per laser per frame).
+    private lazy var playerLaserGeometry: SCNCylinder = {
+
+        let geometry = SCNCylinder(
+            radius: 0.05,
+            height: 0.75
+        )
+
+        geometry.firstMaterial?.diffuse.contents = UIColor.green
+        geometry.firstMaterial?.emission.contents = UIColor.green
+        geometry.firstMaterial?.isDoubleSided = true
+
+        return geometry
+    }()
+
     private lazy var alphaLaserGeometry =
         makeLaserGeometry(color: .magenta)
 
@@ -147,6 +168,10 @@ final class AlienShipBattleSceneWorld {
 
         scene.rootNode.addChildNode(
             projectileContainer
+        )
+
+        scene.rootNode.addChildNode(
+            playerLaserContainer
         )
 
         // COCKPIT CANNON
@@ -949,6 +974,79 @@ final class AlienShipBattleSceneWorld {
     }
 
     // ============================================================
+    // RENDER PLAYER LASERS
+    //
+    // The cannon fires through GameState.shootLaser(), which fills
+    // gameState.playerLasers. Other worlds draw those lasers; this
+    // one did not, so shots were fired and could hit, but were
+    // invisible.
+    //
+    // Laser position and direction are WORLD space and the direction
+    // never changes after firing, so each pooled node just copies
+    // them every frame. The pool grows to the peak number of lasers
+    // in flight and then reuses its nodes.
+    // ============================================================
+
+    private func renderPlayerLasers(
+        game: GameState
+    ) {
+
+        let lasers = game.playerLasers
+
+        while playerLaserNodes.count < lasers.count {
+
+            let node = SCNNode(
+                geometry: playerLaserGeometry
+            )
+
+            playerLaserContainer.addChildNode(
+                node
+            )
+
+            playerLaserNodes.append(
+                node
+            )
+        }
+
+        for (index, node) in playerLaserNodes.enumerated() {
+
+            guard index < lasers.count else {
+
+                node.isHidden = true
+
+                continue
+            }
+
+            let laser = lasers[index]
+
+            node.isHidden = false
+
+            node.position = laser.position
+
+            // The cylinder's long axis is local +Y; point it along
+            // the laser's direction of travel.
+
+            let length = sqrt(
+                laser.direction.x * laser.direction.x +
+                laser.direction.y * laser.direction.y +
+                laser.direction.z * laser.direction.z
+            )
+
+            if length > 0.000001 {
+
+                node.simdOrientation = simd_quatf(
+                    from: SIMD3<Float>(0, 1, 0),
+                    to: SIMD3<Float>(
+                        Float(laser.direction.x / length),
+                        Float(laser.direction.y / length),
+                        Float(laser.direction.z / length)
+                    )
+                )
+            }
+        }
+    }
+
+    // ============================================================
     // SYNCHRONIZE WITH GAME STATE (render side)
     //
     // Does NOT simulate. It registers this world as THE fleet for
@@ -981,5 +1079,7 @@ final class AlienShipBattleSceneWorld {
         renderFleet()
 
         renderProjectiles()
+
+        renderPlayerLasers(game: game)
     }
 }
