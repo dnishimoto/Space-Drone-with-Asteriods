@@ -809,25 +809,401 @@ final class AlienShipBattleSceneWorld {
         for ship: AlienShipState
     ) -> SCNNode {
 
-        let geometry =
-            SCNSphere(
-                radius: 0.5
+        // =========================================================
+        // POLYGONAL ALIEN SHIP
+        // =========================================================
+
+        let segments = 10
+
+        // Hull profile:
+        //
+        //             _________
+        //          __/         \__
+        //       __/               \__
+        //     _/                     \_
+        //    /                         \
+        //    \_________________________/
+
+        let rings: [
+            (radius: Float, y: Float)
+        ] = [
+            (0.16,  0.22),   // top center
+            (0.30,  0.18),   // upper dome
+            (0.50,  0.10),   // upper shoulder
+            (0.68,  0.00),   // widest point
+            (0.54, -0.10),   // lower shoulder
+            (0.28, -0.16),   // underside
+            (0.16, -0.18)    // bottom
+        ]
+
+        // =========================================================
+        // CREATE VERTICES
+        // =========================================================
+
+        var vertices: [SCNVector3] = []
+
+        for ring in rings {
+
+            for i in 0..<segments {
+
+                let angle =
+                    (Float(i) / Float(segments)) *
+                    Float.pi * 2.0
+
+                let x =
+                    cos(angle) * ring.radius
+
+                let z =
+                    sin(angle) * ring.radius
+
+                vertices.append(
+                    SCNVector3(
+                        x,
+                        ring.y,
+                        z
+                    )
+                )
+            }
+        }
+
+        // =========================================================
+        // CREATE TRIANGULAR POLYGON FACES
+        // =========================================================
+
+        var indices: [UInt32] = []
+
+        for ringIndex in 0..<(rings.count - 1) {
+
+            let currentStart =
+                ringIndex * segments
+
+            let nextStart =
+                (ringIndex + 1) * segments
+
+            for i in 0..<segments {
+
+                let next =
+                    (i + 1) % segments
+
+                let a =
+                    UInt32(currentStart + i)
+
+                let b =
+                    UInt32(currentStart + next)
+
+                let c =
+                    UInt32(nextStart + i)
+
+                let d =
+                    UInt32(nextStart + next)
+
+                // Triangle 1
+                indices.append(a)
+                indices.append(c)
+                indices.append(b)
+
+                // Triangle 2
+                indices.append(b)
+                indices.append(c)
+                indices.append(d)
+            }
+        }
+
+        // =========================================================
+        // CREATE SCENE KIT GEOMETRY
+        // =========================================================
+
+        let vertexSource =
+            SCNGeometrySource(
+                vertices: vertices
             )
 
-        geometry.materials = [
+        let indexData =
+            indices.withUnsafeBufferPointer {
+                Data(buffer: $0)
+            }
+
+        let element =
+            SCNGeometryElement(
+                data: indexData,
+                primitiveType: .triangles,
+                primitiveCount: indices.count / 3,
+                bytesPerIndex: MemoryLayout<UInt32>.size
+            )
+
+        let geometry =
+            SCNGeometry(
+                sources: [
+                    vertexSource
+                ],
+                elements: [
+                    element
+                ]
+            )
+
+        // =========================================================
+        // FACTION COLOR
+        // =========================================================
+
+        let factionColor: UIColor
+
+        switch ship.faction {
+
+        case .alpha:
+            factionColor = .magenta
+
+        case .beta:
+            factionColor = .orange
+
+        case .neutral:
+            factionColor = .gray
+
+        case .unknown:
+            factionColor = .white
+        }
+
+        // =========================================================
+        // DARK METALLIC HULL
+        // =========================================================
+
+        let hullMaterial =
             SCNMaterial()
+
+        hullMaterial.diffuse.contents =
+            UIColor(
+                white: 0.12,
+                alpha: 1.0
+            )
+
+        hullMaterial.metalness.contents =
+            0.85
+
+        hullMaterial.roughness.contents =
+            0.28
+
+        geometry.materials = [
+            hullMaterial
         ]
+
+        // =========================================================
+        // MAIN SHIP NODE
+        // =========================================================
 
         let node =
             SCNNode(
                 geometry: geometry
             )
 
+        // =========================================================
+        // RAISED POLYGONAL COMMAND MODULE
+        // =========================================================
+
+        let commandGeometry =
+            SCNCylinder(
+                radius: 0.27,
+                height: 0.09
+            )
+
+        commandGeometry.radialSegmentCount =
+            10
+
+        let commandMaterial =
+            SCNMaterial()
+
+        commandMaterial.diffuse.contents =
+            UIColor(
+                white: 0.16,
+                alpha: 1.0
+            )
+
+        commandMaterial.metalness.contents =
+            0.90
+
+        commandMaterial.roughness.contents =
+            0.22
+
+        commandGeometry.materials = [
+            commandMaterial
+        ]
+
+        let commandNode =
+            SCNNode(
+                geometry: commandGeometry
+            )
+
+        commandNode.position =
+            SCNVector3(
+                0,
+                0.20,
+                0
+            )
+
+        node.addChildNode(
+            commandNode
+        )
+
+        // =========================================================
+        // TOP ENERGY CORE
+        //
+        // Emission creates the visual glow but does NOT create
+        // a light that illuminates other objects in the scene.
+        // =========================================================
+
+        let glowMaterial =
+            SCNMaterial()
+
+        glowMaterial.diffuse.contents =
+            factionColor
+
+        glowMaterial.emission.contents =
+            factionColor
+
+        glowMaterial.emission.intensity =
+            4.0
+
+        let topGlowGeometry =
+            SCNCylinder(
+                radius: 0.18,
+                height: 0.018
+            )
+
+        topGlowGeometry.radialSegmentCount =
+            10
+
+        topGlowGeometry.materials = [
+            glowMaterial
+        ]
+
+        let topGlowNode =
+            SCNNode(
+                geometry: topGlowGeometry
+            )
+
+        topGlowNode.position =
+            SCNVector3(
+                0,
+                0.253,
+                0
+            )
+
+        node.addChildNode(
+            topGlowNode
+        )
+
+        // =========================================================
+        // PERIMETER ENERGY PANELS
+        // =========================================================
+
+        for i in 0..<segments {
+
+            let angle =
+                (Float(i) / Float(segments)) *
+                Float.pi * 2.0
+
+            let panelGeometry =
+                SCNBox(
+                    width: 0.24,
+                    height: 0.035,
+                    length: 0.035,
+                    chamferRadius: 0.008
+                )
+
+            panelGeometry.materials = [
+                glowMaterial
+            ]
+
+            let panelNode =
+                SCNNode(
+                    geometry: panelGeometry
+                )
+
+            let radius: Float =
+                0.61
+
+            panelNode.position =
+                SCNVector3(
+                    cos(angle) * radius,
+                    -0.005,
+                    sin(angle) * radius
+                )
+
+            panelNode.eulerAngles =
+                SCNVector3(
+                    0,
+                    -angle,
+                    0
+                )
+
+            node.addChildNode(
+                panelNode
+            )
+        }
+
+        // =========================================================
+        // UNDERSIDE ENGINE
+        // =========================================================
+
+        let engineGeometry =
+            SCNCylinder(
+                radius: 0.38,
+                height: 0.025
+            )
+
+        engineGeometry.radialSegmentCount =
+            10
+
+        engineGeometry.materials = [
+            glowMaterial
+        ]
+
+        let engineNode =
+            SCNNode(
+                geometry: engineGeometry
+            )
+
+        engineNode.position =
+            SCNVector3(
+                0,
+                -0.19,
+                0
+            )
+
+        node.addChildNode(
+            engineNode
+        )
+
+        // =========================================================
+        // NO SCNLight
+        //
+        // The previous engineLight / engineLightNode has been
+        // intentionally removed.
+        //
+        // The ship still appears illuminated because the
+        // materials use emission, but it does not cast light
+        // onto the rest of the SceneKit world.
+        // =========================================================
+
+        // =========================================================
+        // LARGE SHIP
+        // =========================================================
+
+        node.scale =
+            SCNVector3(
+                2.5,
+                2.5,
+                2.5
+            )
+
+        // =========================================================
+        // EXISTING FLEET INTEGRATION
+        // =========================================================
+
         fleetContainer.addChildNode(
             node
         )
 
-        shipNodes[ship.fleetID] = node
+        shipNodes[ship.fleetID] =
+            node
 
         return node
     }
