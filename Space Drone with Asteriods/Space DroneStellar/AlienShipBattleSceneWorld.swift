@@ -28,6 +28,7 @@ import simd
 @MainActor
 final class AlienShipBattleSceneWorld {
 
+
     let scene = SCNScene()
 
     let camera = SCNNode()
@@ -189,7 +190,57 @@ final class AlienShipBattleSceneWorld {
 
         renderFleet()
     }
+    func renderFleet() {
 
+        var live = Set<Int>()
+
+        // ============================================================
+        // RENDER LIVE ALIEN SHIPS
+        // ============================================================
+
+        for ship in fleet
+        where !ship.destroyed {
+
+            live.insert(ship.fleetID)
+
+            let node =
+                shipNodes[ship.fleetID]
+                ?? makeShipNode(for: ship)
+
+            node.position = ship.position
+
+            updateAppearance(
+                of: node,
+                for: ship
+            )
+        }
+
+        // ============================================================
+        // REMOVE NODES THAT ARE NO LONGER LIVE
+        // ============================================================
+
+        for (id, node) in shipNodes
+        where !live.contains(id) {
+
+            node.removeFromParentNode()
+        }
+
+        // ============================================================
+        // CLEAN NODE CACHE
+        // ============================================================
+
+        shipNodes = shipNodes.filter {
+            live.contains($0.key)
+        }
+
+        // ============================================================
+        // CLEAN APPEARANCE STATE
+        // ============================================================
+
+        shipVisualState = shipVisualState.filter {
+            live.contains($0.key)
+        }
+    }
     // ============================================================
     // COCKPIT CANNON
     //
@@ -693,28 +744,20 @@ final class AlienShipBattleSceneWorld {
         projectiles = survivors
     }
 
-    // ============================================================
-    // PLAYER CANNON LASERS
-    //
-    // gameState.playerLasers are world-space and are advanced later
-    // in GameState.update(), so each laser covers the segment from
-    // where it was last frame to where it is now. Lasers that hit
-    // are removed so one shot cannot hit twice.
-    // ============================================================
-
     private func resolvePlayerLasers(
         game: GameState,
         dt: Float
     ) {
-
         guard !game.playerLasers.isEmpty else {
             return
         }
 
         let travel = Float(Laser.speed) * dt
 
-        var consumedIndices: [Int] = []
+        var consumedIndices: Set<Int> = []
+        var shipsToRemove: [AlienShipState] = []
 
+        // Detect laser collisions.
         for index in game.playerLasers.indices {
 
             let laser = game.playerLasers[index]
@@ -733,8 +776,7 @@ final class AlienShipBattleSceneWorld {
                 )
             )
 
-            for ship in fleet
-            where !ship.destroyed {
+            for ship in fleet where !ship.destroyed {
 
                 let miss =
                     AlienShipState.distanceToSegment(
@@ -743,66 +785,122 @@ final class AlienShipBattleSceneWorld {
                         end
                     )
 
-                if miss <= ship.collisionRadius + 0.15 {
-
-                    ship.applyDamage(
-                        AlienShipState.playerLaserDamage
-                    )
-
-                    consumedIndices.append(index)
-
-                    break
+                guard miss <= ship.collisionRadius + 0.15 else {
+                    continue
                 }
+
+                // One player laser hit destroys the alien.
+                ship.applyPlayerLaserHit()
+
+                consumedIndices.insert(index)
+
+                if ship.destroyed {
+                    shipsToRemove.append(ship)
+                }
+
+                break
             }
         }
 
-        for index in consumedIndices.reversed() {
+        // Remove consumed player lasers.
+        for index in consumedIndices.sorted(by: >) {
+            guard game.playerLasers.indices.contains(index) else {
+                continue
+            }
 
             game.playerLasers.remove(at: index)
         }
-    }
 
-    // ============================================================
-    // RENDER FLEET
-    //
-    // Nodes are cached per fleetID and only moved each frame
-    // (the old version destroyed and rebuilt every node every frame).
-    // ============================================================
+        // ---------------------------------------------------------
+        // CLEANUP ONLY THE ALIENS COLLECTED IN shipsToRemove.
+        // ---------------------------------------------------------
 
-    func renderFleet() {
+        guard !shipsToRemove.isEmpty else {
+            return
+        }
 
-        var live = Set<Int>()
+        for ship in shipsToRemove {
 
-        for ship in fleet
-        where !ship.destroyed {
+            // Capture the exact destruction location.
+            let destructionPosition = ship.position
 
-            live.insert(ship.fleetID)
+            // CREATE THE BURST HERE.
+            createAlienDestructionBurst(
+                at: destructionPosition
+            )
 
-            let node =
-                shipNodes[ship.fleetID]
-                ?? makeShipNode(for: ship)
+            // Remove alien from fleet.
+            if let fleetIndex = fleet.firstIndex(where: {
+                $0 === ship
+            }) {
+                fleet.remove(at: fleetIndex)
+            }
 
-            node.position = ship.position
+            // Remove alien's SceneKit node.
+            if let node = shipNodes.removeValue(
+                forKey: ship.fleetID
+            ) {
+                node.removeFromParentNode()
+            }
 
-            updateAppearance(
-                of: node,
-                for: ship
+            // Remove cached visual state.
+            shipVisualState.removeValue(
+                forKey: ship.fleetID
             )
         }
+    }
+    private func createAlienDestructionBurst(at position: SCNVector3) {
+        let burstNode = SCNNode()
+        burstNode.position = position
 
-        for (id, node) in shipNodes
-        where !live.contains(id) {
+        let particles = SCNParticleSystem()
 
-            node.removeFromParentNode()
-        }
+        // One-shot emission.
+        particles.birthRate = 2500
+        particles.birthRateVariation = 0
+        particles.loops = false
+        particles.emissionDuration = 0.05
+        particles.emissionDurationVariation = 0
+        particles.warmupDuration = 0
 
-        shipNodes = shipNodes.filter {
-            live.contains($0.key)
-        }
+        // Particle lifetime and size.
+        particles.particleLifeSpan = 0.45
+        particles.particleLifeSpanVariation = 0.20
 
-        shipVisualState = shipVisualState.filter {
-            live.contains($0.key)
-        }
+        particles.particleSize = 0.08
+        particles.particleSizeVariation = 0.06
+
+        // SceneKit uses geometry to define the emitter.
+        particles.emitterShape = SCNSphere(radius: 0.12)
+        particles.birthLocation = .surface
+        particles.birthDirection = .random
+        particles.spreadingAngle = 180
+
+        // Burst motion.
+        particles.particleVelocity = 5.0
+        particles.particleVelocityVariation = 3.0
+        particles.acceleration = SCNVector3(0, -1.5, 0)
+
+        // Appearance.
+        particles.blendMode = .additive
+        particles.particleColor = .white
+        particles.particleColorVariation = SCNVector4(
+            1.0,
+            0.5,
+            0.2,
+            0.0
+        )
+
+        burstNode.addParticleSystem(particles)
+        scene.rootNode.addChildNode(burstNode)
+
+        // Leave time for the emitted particles to expire.
+        burstNode.runAction(
+            SCNAction.sequence([
+                SCNAction.wait(duration: 1.0),
+                SCNAction.removeFromParentNode()
+            ])
+        )
     }
 
     private func makeShipNode(

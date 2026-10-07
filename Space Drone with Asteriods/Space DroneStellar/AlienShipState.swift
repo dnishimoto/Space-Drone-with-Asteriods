@@ -32,10 +32,8 @@ import ObjectiveC
 
 final class AlienShipState {
 
-    // ============================================================
-    // BEHAVIORAL STATE
-    // ============================================================
-
+    var playerLaserHitsRemaining: Int = 2
+    
     enum BehavioralState: String, Codable {
         case idle
         case approaching
@@ -138,7 +136,7 @@ final class AlienShipState {
     var evadeDirection: Float = 1.0
 
     // Collision
-    var collisionRadius: Float = 0.75
+    var collisionRadius: Float = 1.0
 
     var destroyed: Bool {
         behavioralState == .destroyed
@@ -172,7 +170,8 @@ final class AlienShipState {
         maneuverability: Float = 1.0,
         faction: Faction = .alpha,
         targetID: Int? = nil,
-        behavioralState: BehavioralState = .idle
+        behavioralState: BehavioralState = .idle,
+       playerLaserHitsRemaining: Int = 2
     ) {
         self.fleetID = fleetID
         self.position = position
@@ -185,8 +184,17 @@ final class AlienShipState {
         self.faction = faction
         self.targetID = targetID
         self.behavioralState = behavioralState
+        self.playerLaserHitsRemaining = playerLaserHitsRemaining
     }
+    func applyPlayerLaserHit() {
 
+        guard !destroyed else {
+            return
+        }
+
+        playerLaserHitsRemaining = 0
+        becomeDestroyed()
+    }
     // ============================================================
     // HOSTILITY
     // ============================================================
