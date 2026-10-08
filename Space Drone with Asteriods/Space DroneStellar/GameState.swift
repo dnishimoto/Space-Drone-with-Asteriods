@@ -52,13 +52,15 @@ final class GameState: ObservableObject {
 
     var joystickVector: CGVector = .zero
 
- 
+    // Add a playerLives property to GameState to be shown in ContentView
+    @Published var playerLives: Int = 3
+
     // ============================================================
     // GAME
     // ============================================================
 
-    @Published var score = 80_000
-    //@Published var score = 0
+   //@Published var score = 80_000
+    @Published var score = 0
 
     @Published var gameOver = false
 
@@ -503,6 +505,11 @@ final class GameState: ObservableObject {
         start()
     }
     
+    // In GameState, add a function for AlienShipBattleSceneWorld to update lives:
+    func setPlayerLives(_ lives: Int) {
+        playerLives = lives
+    }
+    
     @objc private func frameUpdate(_ link: CADisplayLink) {
         if lastFrameTimestamp == nil {
             lastFrameTimestamp = link.timestamp
@@ -522,3 +529,4 @@ struct ExplosionEvent {
     var z: CGFloat
     var scale: Float
 }
+

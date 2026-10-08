@@ -1,4 +1,3 @@
-
 //
 //  AlienShipBattleSceneWorld.swift
 //
@@ -39,6 +38,12 @@ final class AlienShipBattleSceneWorld {
 
     /// World-space container for the player's cannon lasers.
     private let playerLaserContainer = SCNNode()
+
+    // ============================================================
+    // Player tracking
+    // ============================================================
+    private(set) var playerLife: Int = 3
+    private var playerKillCount: Int = 0
 
     // ============================================================
     // TUNING
@@ -617,7 +622,7 @@ final class AlienShipBattleSceneWorld {
         // 3. HITS
         // ========================================================
 
-        advanceAlienProjectiles(dt: dtF)
+        advanceAlienProjectiles(dt: dtF, game: game)
 
         resolvePlayerLasers(
             game: game,
@@ -683,10 +688,12 @@ final class AlienShipBattleSceneWorld {
     // Moves every alien shot and resolves it against enemy ships
     // with a swept (segment vs sphere) test so fast shots cannot
     // tunnel through a ship between frames.
+    // Also alien projectiles can hit the player.
     // ============================================================
 
     private func advanceAlienProjectiles(
-        dt: Float
+        dt: Float,
+        game: GameState
     ) {
 
         var survivors: [Projectile] = []
@@ -711,6 +718,7 @@ final class AlienShipBattleSceneWorld {
 
             var consumed = false
 
+            // Check hits on alien ships
             for ship in fleet
             where !ship.destroyed &&
                   ship.fleetID != shot.ownerID &&
@@ -733,6 +741,39 @@ final class AlienShipBattleSceneWorld {
                     consumed = true
 
                     break
+                }
+            }
+
+            if consumed {
+                // Alien projectile hit an alien ship
+                continue
+            }
+
+            // ====================================================
+            // Alien projectiles can hit the player
+            // ====================================================
+
+            if shot.targetID == nil || shot.targetID == -1 {
+                // Check swept collision with player ship at radius 1.0
+                let missToPlayer = AlienShipState.distanceToSegment(
+                    game.spaceShip.position,
+                    start,
+                    shot.position
+                )
+                if missToPlayer <= 1.0 {
+                    // Player hit by alien projectile
+                    playerLife -= 1
+                    game.setPlayerLives(playerLife) // Update UI
+
+                    // Create explosion at hit position (approximate with shot.position)
+                    createAlienDestructionBurst(at: shot.position)
+
+                    if playerLife <= 0 {
+                        game.gameOver = true
+                    }
+
+                    consumed = true
+                    // Break after hit
                 }
             }
 
@@ -796,6 +837,15 @@ final class AlienShipBattleSceneWorld {
 
                 if ship.destroyed {
                     shipsToRemove.append(ship)
+
+                    // Player kill count increment and extra life every 3 kills
+                    playerKillCount += 1
+                    if playerKillCount == 3 {
+                        playerLife += 1
+                        game.setPlayerLives(playerLife) // Update UI
+                        playerKillCount = 0
+                        // Player gains an extra life every 3 kills
+                    }
                 }
 
                 break
@@ -1555,5 +1605,16 @@ final class AlienShipBattleSceneWorld {
         renderProjectiles()
 
         renderPlayerLasers(game: game)
+
+        displayPlayerLives()
+    }
+
+    // ============================================================
+    // PLAYER LIVES DISPLAY
+    // ============================================================
+
+    private func displayPlayerLives() {
+        print("Player Lives: \(playerLife)")
     }
 }
+

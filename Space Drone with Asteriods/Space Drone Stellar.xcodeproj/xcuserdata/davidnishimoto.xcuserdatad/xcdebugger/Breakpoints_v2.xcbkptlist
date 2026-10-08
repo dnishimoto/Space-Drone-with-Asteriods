@@ -14,8 +14,8 @@
             filePath = "Space DroneStellar/AlienShipBattleSceneWorld.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "793"
-            endingLineNumber = "793"
+            startingLineNumber = "834"
+            endingLineNumber = "834"
             landmarkName = "resolvePlayerLasers(game:dt:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -30,8 +30,8 @@
             filePath = "Space DroneStellar/AlienShipBattleSceneWorld.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "798"
-            endingLineNumber = "798"
+            startingLineNumber = "839"
+            endingLineNumber = "839"
             landmarkName = "resolvePlayerLasers(game:dt:)"
             landmarkType = "7">
          </BreakpointContent>
